@@ -114,5 +114,6 @@ Nouveaux workflows Langflow, tous locaux :
 2. **Échéances et actions** : extraire dates et tâches des mails vers une page « À faire ».
 3. **Brouillon de réponse** : proposer une réponse, créée en brouillon dans Outlook ou Gmail.
 4. **Tri hybride** : règles par expéditeur connu d'abord, IA seulement pour les nouveaux cas.
+5. **Bouton « Lancer l'IA »** : démarrer Langflow depuis l'app (page Comptes, voyant « IA hors ligne ») au lieu de taper la commande.
 
 Limites connues : un mail Gmail qui porte plusieurs libellés n'apparaît que dans un seul dossier ; l'analyse traite un lot à la fois (un seul processus, verrou en mémoire).
