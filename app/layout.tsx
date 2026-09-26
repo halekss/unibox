@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 export const metadata = { title: "Boîte unifiée" };
 
@@ -7,7 +8,7 @@ const css = `
 @media (prefers-color-scheme: dark) { :root { --bg:#141414; --card:#1e1e1e; --text:#eee; --muted:#999; --border:#333; --accent:#60a5fa; --danger:#f87171; } }
 * { box-sizing: border-box; }
 body { margin:0; font:15px/1.5 system-ui, sans-serif; background:var(--bg); color:var(--text); }
-main { max-width:900px; margin:0 auto; padding:24px 16px; }
+main { max-width:1100px; margin:0 auto; padding:24px 16px; }
 h1 { font-size:1.4rem; margin:0 0 4px; }
 .muted { color:var(--muted); font-size:.9rem; }
 .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:16px; margin:16px 0; }
@@ -20,7 +21,15 @@ button.danger { color:var(--danger); }
 ul { list-style:none; padding:0; margin:12px 0; }
 li { padding:6px 0; border-top:1px solid var(--border); }
 li label { display:flex; gap:8px; align-items:baseline; cursor:pointer; }
-details { margin:4px 0 0 24px; }
+li details { margin:4px 0 0 24px; }
+section li details { margin:0; }
+header { display:flex; gap:16px; padding:12px 16px; border-bottom:1px solid var(--border); background:var(--card); }
+a { color:var(--accent); text-decoration:none; }
+a[aria-current] { font-weight:600; text-decoration:underline; }
+h2 { font-size:1.1rem; margin:0 0 8px; }
+.split { display:grid; grid-template-columns:260px 1fr; gap:24px; margin-top:16px; }
+.split nav li { border:0; padding:3px 0; }
+@media (max-width: 700px) { .split { grid-template-columns:1fr; } }
 summary { cursor:pointer; color:var(--muted); font-size:.85rem; }
 pre { white-space:pre-wrap; font:inherit; font-size:.85rem; color:var(--muted); margin:6px 0; }
 .actions { display:flex; gap:8px; justify-content:flex-end; }
@@ -31,6 +40,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="fr">
       <body>
         <style>{css}</style>
+        <header>
+          <Link href="/boite">Boîte unifiée</Link>
+          <Link href="/">Propositions</Link>
+        </header>
         <main>{children}</main>
       </body>
     </html>
