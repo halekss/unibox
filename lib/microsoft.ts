@@ -1,9 +1,11 @@
 import { Client } from "@microsoft/microsoft-graph-client";
 import { db } from "./db.ts";
 import { encrypt, decrypt } from "./crypto.ts";
+import { INBOX } from "./classify.ts";
 
 const AUTHORITY = "https://login.microsoftonline.com/consumers/oauth2/v2.0";
-const SCOPES = "offline_access User.Read Mail.Read";
+// Mail.ReadWrite: needed to move a deleted email to Outlook's "Éléments supprimés".
+const SCOPES = "offline_access User.Read Mail.ReadWrite";
 
 export function authorizeUrl(state: string): string {
   const q = new URLSearchParams({
@@ -83,6 +85,13 @@ export async function getAccessToken(acc: Account): Promise<string> {
   acc.refresh_token_enc = encrypt(t.refresh_token);
   acc.expires_at = new Date(Date.now() + t.expires_in * 1000);
   return t.access_token;
+}
+
+// Graph client that refreshes the account's token as needed (safe for long runs).
+function clientFor(acc: Account): Client {
+  return Client.init({
+    authProvider: (done) => getAccessToken(acc).then((t) => done(null, t), (e) => done(e, null)),
+  });
 }
 
 type GraphMessage = {
@@ -182,9 +191,7 @@ async function syncFolder(client: Client, accountId: number, folder: { id: strin
 }
 
 export async function syncAccount(acc: Account) {
-  const client = Client.init({
-    authProvider: (done) => getAccessToken(acc).then((t) => done(null, t), (e) => done(e, null)),
-  });
+  const client = clientFor(acc);
   const total = { folders: 0, fetched: 0, inserted: 0, deleted: 0 };
   const { rows: known } = await db.query("SELECT external_id, path, delta_link FROM folders WHERE account_id = $1", [acc.id]);
   const knownById = new Map(known.map((f) => [f.external_id as string, f]));
@@ -221,4 +228,58 @@ export async function syncAccount(acc: Account) {
     total.deleted += res.rowCount ?? 0;
   }
   return total;
+}
+
+// Same as pressing Delete in Outlook: the message goes to "Éléments supprimés" and can be restored from there.
+export async function trashMessage(acc: Account, externalId: string): Promise<void> {
+  const client = clientFor(acc);
+  await client.api(`/me/messages/${encodeURIComponent(externalId)}/move`).header("Prefer", IMMUTABLE).post({ destinationId: "deleteditems" });
+}
+
+// Returns the id of the Outlook folder at `path` ("Boîte de réception/A/B"), creating missing levels.
+async function ensureFolder(client: Client, path: string): Promise<string> {
+  const [root, ...parts] = path.split("/");
+  if (root !== INBOX) throw new Error(`Dossier hors de la Boîte de réception : ${path}`);
+  let id: string = (await client.api("/me/mailFolders/inbox").select("id").get()).id;
+  for (const name of parts) {
+    // ponytail: first 100 children per level, same limit as listFolders.
+    const { value } = await client.api(`/me/mailFolders/${id}/childFolders`).select("id,displayName").top(100).get();
+    const found = value.find((f: { displayName: string }) => f.displayName.toLowerCase() === name.toLowerCase());
+    id = found ? found.id : (await client.api(`/me/mailFolders/${id}/childFolders`).post({ displayName: name })).id;
+  }
+  return id;
+}
+
+// App folder name -> Outlook path: "Epitech" -> "Boîte de réception/Epitech"; full paths are kept.
+export const outlookPath = (name: string) => (name === INBOX || name.startsWith(`${INBOX}/`) ? name : `${INBOX}/${name}`);
+
+// Applies app folders to Outlook: creates the folder if needed and moves the email there. On success the
+// email's folder becomes the Outlook path and app_folder is cleared; on failure app_folder stays (retry later).
+export async function applyAppFolders(ids?: number[]): Promise<{ moved: number; failed: { id: number; error: string }[] }> {
+  const { rows } = await db.query(
+    `SELECT e.id AS email_id, e.external_id, e.app_folder,
+            a.id, a.email, a.access_token_enc, a.refresh_token_enc, a.expires_at
+     FROM emails e JOIN accounts a ON a.id = e.account_id
+     WHERE e.app_folder IS NOT NULL AND ($1::int[] IS NULL OR e.id = ANY($1))`,
+    [ids ?? null],
+  );
+  const clients = new Map<number, Client>();
+  const folderIds = new Map<string, string>();
+  const result = { moved: 0, failed: [] as { id: number; error: string }[] };
+  for (const r of rows) {
+    try {
+      const acc: Account = r;
+      if (!clients.has(acc.id)) clients.set(acc.id, clientFor(acc));
+      const client = clients.get(acc.id)!;
+      const path = outlookPath(r.app_folder);
+      const key = `${acc.id}:${path}`;
+      if (!folderIds.has(key)) folderIds.set(key, await ensureFolder(client, path));
+      await client.api(`/me/messages/${encodeURIComponent(r.external_id)}/move`).header("Prefer", IMMUTABLE).post({ destinationId: folderIds.get(key) });
+      await db.query("UPDATE emails SET folder = $1, app_folder = NULL WHERE id = $2", [path, r.email_id]);
+      result.moved++;
+    } catch (e) {
+      result.failed.push({ id: r.email_id, error: (e as Error).message });
+    }
+  }
+  return result;
 }

@@ -32,6 +32,9 @@ h2 { font-size:1.1rem; margin:0 0 8px; }
 @media (max-width: 700px) { .split { grid-template-columns:1fr; } }
 summary { cursor:pointer; color:var(--muted); font-size:.85rem; }
 pre { white-space:pre-wrap; font:inherit; font-size:.85rem; color:var(--muted); margin:6px 0; }
+.row { display:flex; gap:8px; align-items:flex-start; justify-content:space-between; }
+.row > details, .row > label { flex:1; }
+button.small { padding:2px 10px; font-size:.8rem; }
 .actions { display:flex; gap:8px; justify-content:flex-end; }
 `;
 

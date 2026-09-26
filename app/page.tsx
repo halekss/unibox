@@ -1,6 +1,7 @@
 import { db } from "@/lib/db.ts";
+import { plain } from "./text.ts";
 import { EFFECTIVE_FOLDER, INBOX } from "@/lib/classify.ts";
-import { confirmProposal, rejectProposal } from "./actions.ts";
+import { confirmProposal, deleteEmail, rejectProposal } from "./actions.ts";
 import { AnalyzeForm } from "./AnalyzeForm.tsx";
 
 export const dynamic = "force-dynamic";
@@ -28,8 +29,8 @@ export default async function Proposals() {
     <>
       <h1>Propositions de rangement</h1>
       <p className="muted">
-        L'IA propose, tu décides. Confirmer range les mails cochés dans le dossier, dans l'app seulement (Outlook
-        n'est pas modifié).
+        L'IA propose, tu décides. Confirmer range les mails cochés dans le dossier, dans l'app et dans Outlook (le
+        sous-dossier est créé sous la Boîte de réception s'il n'existe pas).
       </p>
       <AnalyzeForm left={left.n} />
 
@@ -49,6 +50,7 @@ export default async function Proposals() {
             <ul>
               {emails.map((e) => (
                 <li key={e.id}>
+                  <div className="row">
                   <label>
                     <input type="checkbox" name="ids" value={e.id} defaultChecked />
                     <span>
@@ -58,9 +60,13 @@ export default async function Proposals() {
                       </span>
                     </span>
                   </label>
+                  <button className="danger small" formAction={deleteEmail.bind(null, e.id)} title="Envoie le mail dans Éléments supprimés d'Outlook">
+                    Supprimer
+                  </button>
+                  </div>
                   <details>
                     <summary>Aperçu</summary>
-                    <pre>{e.preview}</pre>
+                    <pre>{plain(e.preview)}</pre>
                   </details>
                 </li>
               ))}
