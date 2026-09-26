@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db.ts";
-import { tagInbox } from "@/lib/classify.ts";
+import { scanFoldersForCleanup, tagInbox } from "@/lib/classify.ts";
 import { applyAppFolders, trashMessage } from "@/lib/microsoft.ts";
 
 function selection(form: FormData) {
@@ -41,19 +41,28 @@ export async function rejectProposal(form: FormData) {
   revalidatePath("/");
 }
 
+// One AI batch at a time (both share the GPU).
 // ponytail: in-process lock, enough for one local dev server; move to a DB lock if the app ever runs on several processes.
 let analyzing = false;
 
-export async function analyzeInbox(_prev: null): Promise<null> {
+async function runBatch(batch: () => Promise<unknown>) {
   if (analyzing) return null;
   analyzing = true;
   try {
-    await tagInbox(20);
+    await batch();
   } finally {
     analyzing = false;
   }
-  revalidatePath("/");
+  refreshPages();
   return null;
+}
+
+export async function analyzeInbox(_prev: null): Promise<null> {
+  return runBatch(() => tagInbox(20));
+}
+
+export async function scanForCleanup(_prev: null): Promise<null> {
+  return runBatch(() => scanFoldersForCleanup(20));
 }
 
 // Moves the email to Outlook's trash, then removes it from the app.

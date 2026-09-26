@@ -1,13 +1,13 @@
 "use client";
 
 import { useActionState } from "react";
-import { analyzeInbox } from "./actions.ts";
 
-export function AnalyzeForm({ left }: { left: number }) {
-  const [, action, pending] = useActionState(analyzeInbox, null);
+// Button for a long AI batch (~2 min): disabled with a progress label while the server action runs.
+export function AnalyzeForm({ text, left, run }: { text: string; left: number; run: (prev: null) => Promise<null> }) {
+  const [, action, pending] = useActionState(run, null);
   return (
     <form action={action} className="card head">
-      <span>{left} mail(s) de la Boîte de réception à analyser (refusés inclus).</span>
+      <span>{text}</span>
       <button disabled={left === 0 || pending} aria-busy={pending}>
         {pending ? "Analyse en cours… (~2 min, ne ferme pas la page)" : "Analyser les 20 suivants (~2 min)"}
       </button>

@@ -1,7 +1,7 @@
 import { db } from "@/lib/db.ts";
 import { plain } from "./text.ts";
 import { EFFECTIVE_FOLDER, INBOX } from "@/lib/classify.ts";
-import { confirmProposal, deleteEmail, rejectProposal } from "./actions.ts";
+import { analyzeInbox, confirmProposal, deleteEmail, rejectProposal } from "./actions.ts";
 import { AnalyzeForm } from "./AnalyzeForm.tsx";
 
 export const dynamic = "force-dynamic";
@@ -32,7 +32,7 @@ export default async function Proposals() {
         L'IA propose, tu décides. Confirmer range les mails cochés dans le dossier, dans l'app et dans Outlook (le
         sous-dossier est créé sous la Boîte de réception s'il n'existe pas).
       </p>
-      <AnalyzeForm left={left.n} />
+      <AnalyzeForm left={left.n} run={analyzeInbox} text={`${left.n} mail(s) de la Boîte de réception à analyser (refusés inclus).`} />
 
       {sorted.length === 0 && <p className="muted">Aucune proposition en attente.</p>}
 

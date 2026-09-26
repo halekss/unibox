@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parsePrediction, toTags } from "./classify.ts";
+import { parseOrNothing, parsePrediction, toTags } from "./classify.ts";
 
 const paths = new Set(["Boîte de réception/Candidatures"]);
 
@@ -40,4 +40,8 @@ test("delete suggestion is tagged unless the user chose to keep the email", () =
 
 test("delete_reason is parsed", () => {
   assert.equal(parsePrediction('{"folder": null, "confidence": "basse", "new_folder_idea": null, "delete_reason": "pub"}', paths).delete_reason, "pub");
+});
+
+test("malformed JSON counts as no opinion instead of failing the run", () => {
+  assert.deepEqual(parseOrNothing('{"folder" null}', paths), { folder: null, confidence: null, new_folder_idea: null, delete_reason: null });
 });

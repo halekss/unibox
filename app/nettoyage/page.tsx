@@ -1,7 +1,8 @@
 import { db } from "@/lib/db.ts";
-import { REFUSALS_BEFORE_DELETE } from "@/lib/classify.ts";
+import { REFUSALS_BEFORE_DELETE, cleanupLeft } from "@/lib/classify.ts";
 import { plain } from "../text.ts";
-import { deleteSelected, keepSelected } from "../actions.ts";
+import { deleteSelected, keepSelected, scanForCleanup } from "../actions.ts";
+import { AnalyzeForm } from "../AnalyzeForm.tsx";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ export default async function Cleanup() {
      ORDER BY received_at`,
     [REFUSALS_BEFORE_DELETE],
   );
+  const left = await cleanupLeft();
 
   return (
     <>
@@ -28,6 +30,7 @@ export default async function Cleanup() {
         Mails que l'IA juge inutiles, ou dont tu as refusé le classement {REFUSALS_BEFORE_DELETE} fois ou plus. Supprimer
         les envoie dans « Éléments supprimés » d'Outlook (récupérables). Garder les retire définitivement de cette liste.
       </p>
+      <AnalyzeForm left={left} run={scanForCleanup} text={`${left} mail(s) rangé(s) dans des dossiers pas encore examiné(s) pour le nettoyage.`} />
       {rows.length === 0 ? (
         <p className="muted">Aucun mail à nettoyer.</p>
       ) : (

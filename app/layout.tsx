@@ -16,6 +16,7 @@ h1 { font-size:1.4rem; margin:0 0 4px; }
 .badge { font-size:.75rem; padding:2px 8px; border-radius:99px; border:1px solid var(--border); color:var(--muted); }
 input[type=text] { font:inherit; padding:6px 10px; border:1px solid var(--border); border-radius:6px; background:var(--bg); color:var(--text); flex:1; min-width:200px; }
 button { font:inherit; padding:6px 14px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); cursor:pointer; }
+button:disabled { opacity:.5; cursor:not-allowed; }
 button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
 button.danger { color:var(--danger); }
 ul { list-style:none; padding:0; margin:12px 0; }

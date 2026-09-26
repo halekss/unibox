@@ -72,7 +72,18 @@ export async function classify(email: Email, catalog: Catalog): Promise<Predicti
   });
   if (!res.ok) throw new Error(`Langflow ${res.status}: ${(await res.text()).slice(0, 300)}`);
   const json = await res.json();
-  return parsePrediction(json.outputs[0].outputs[0].results.message.text, catalog.paths);
+  return parseOrNothing(json.outputs[0].outputs[0].results.message.text, catalog.paths, email.id);
+}
+
+// The model occasionally returns malformed JSON. At temperature 0 a retry gives the same answer, so an
+// unreadable answer counts as "no opinion": the email is marked processed and the run goes on.
+export function parseOrNothing(answer: string, paths: Set<string>, emailId?: number): Prediction {
+  try {
+    return parsePrediction(answer, paths);
+  } catch (e) {
+    console.warn(`classify: réponse illisible pour l'email ${emailId}: ${(e as Error).message}`);
+    return { folder: null, confidence: null, new_folder_idea: null, delete_reason: null };
+  }
 }
 
 // Stored as a flat tag list; "ai:<model>" marks the email as processed even when nothing is suggested.
@@ -111,4 +122,34 @@ export async function tagInbox(limit: number, dry = false) {
     results.push({ subject: e.subject, sender: e.sender, confidence: pred.confidence, ...decide(pred) });
   }
   return results;
+}
+
+const CLEANUP_MARK = "cleanup:qwen2.5:14b";
+
+// Asks the model only for a delete opinion on emails already filed in a folder (the folder choice is ignored).
+// Each email is marked once examined, so the scan can be interrupted and resumed.
+export async function scanFoldersForCleanup(limit: number) {
+  const { rows } = await db.query(
+    `SELECT id, sender, subject, body_text, tags, ${EFFECTIVE_FOLDER} AS f FROM emails
+     WHERE ${EFFECTIVE_FOLDER} <> $1 AND NOT tags ? $2 AND NOT tags ? 'keep'
+     ORDER BY received_at LIMIT $3`,
+    [INBOX, CLEANUP_MARK, limit],
+  );
+  let suggested = 0;
+  for (const e of rows) {
+    const note = { text: `(aucun à choisir : cet email est déjà rangé dans « ${e.f} ». Donne seulement delete_reason.)`, paths: new Set<string>() };
+    const { delete_reason } = await classify(e, note);
+    const add = [CLEANUP_MARK, ...(delete_reason ? [`delete_suggested:${delete_reason}`] : [])];
+    await db.query("UPDATE emails SET tags = tags || $1::jsonb WHERE id = $2", [JSON.stringify(add), e.id]);
+    if (delete_reason) suggested++;
+  }
+  return { scanned: rows.length, suggested, left: await cleanupLeft() };
+}
+
+export async function cleanupLeft(): Promise<number> {
+  const { rows } = await db.query(
+    `SELECT count(*)::int AS n FROM emails WHERE ${EFFECTIVE_FOLDER} <> $1 AND NOT tags ? $2 AND NOT tags ? 'keep'`,
+    [INBOX, CLEANUP_MARK],
+  );
+  return rows[0].n;
 }
