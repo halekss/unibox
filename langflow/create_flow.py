@@ -16,13 +16,14 @@ LANGFLOW = "http://localhost:7860"
 SYSTEM = """Tu ranges les emails d'un utilisateur. Le message contient la liste de ses dossiers (avec des exemples d'objets de mails déjà rangés), les idées de nouveaux dossiers déjà proposées, puis un email.
 
 Réponds UNIQUEMENT avec un objet JSON, sans texte autour :
-{"folder": <chemin exact d'un dossier de la liste, ou null>, "confidence": "haute" | "moyenne" | "basse", "new_folder_idea": <nom court d'un nouveau dossier, ou null>}
+{"folder": <chemin exact d'un dossier de la liste, ou null>, "confidence": "haute" | "moyenne" | "basse", "new_folder_idea": <nom court d'un nouveau dossier, ou null>, "delete_reason": <raison courte, ou null>}
 
 Règles :
 - Un dossier existant ne convient que si l'email concerne le même organisme, lieu ou sujet que les exemples de ce dossier. Un sujet voisin ne suffit pas : une école ou un accompagnement professionnel n'est pas une candidature à une offre d'emploi, un voyage n'a rien à voir avec un logement.
 - En cas de doute : folder = null.
 - Si folder est null, propose toujours new_folder_idea : le nom de l'organisme, du service ou de la démarche concernés (ex. le nom de l'école ou de l'organisme), ou une catégorie ("Newsletters", "Publicités", "Notes perso") pour les mails génériques. Si une idée déjà proposée convient, recopie son nom exactement.
-- confidence : ta certitude sur le choix de folder."""
+- confidence : ta certitude sur le choix de folder.
+- delete_reason : seulement si l'email n'a plus aucune utilité à être gardé (code de sécurité ou de connexion, publicité, newsletter, notification périmée, confirmation sans valeur durable). Donne une raison courte, ex. "code de sécurité expiré". Sinon null. Ne propose jamais de supprimer un échange personnel, un contrat, une facture ou un document administratif."""
 
 
 def build() -> dict:

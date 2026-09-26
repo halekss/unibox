@@ -4,7 +4,7 @@ export const INBOX = "Boîte de réception";
 const BODY_CHARS = 2000;
 
 type Email = { id: number; sender: string | null; subject: string | null; body_text: string | null; tags?: string[] };
-export type Prediction = { folder: string | null; confidence: string | null; new_folder_idea: string | null };
+export type Prediction = { folder: string | null; confidence: string | null; new_folder_idea: string | null; delete_reason?: string | null };
 type Catalog = { text: string; paths: Set<string> };
 
 // Where an email lives in the app: the folder confirmed in the app wins over the Outlook folder.
@@ -42,7 +42,8 @@ export function parsePrediction(answer: string, paths: Set<string>): Prediction 
   const folder = typeof raw.folder === "string" && paths.has(raw.folder) ? raw.folder : null;
   const confidence = typeof raw.confidence === "string" ? raw.confidence : null;
   const idea = typeof raw.new_folder_idea === "string" && raw.new_folder_idea.trim() ? raw.new_folder_idea.trim() : null;
-  return { folder, confidence, new_folder_idea: idea };
+  const del = typeof raw.delete_reason === "string" && raw.delete_reason.trim() ? raw.delete_reason.trim() : null;
+  return { folder, confidence, new_folder_idea: idea, delete_reason: del };
 }
 
 // Only a confident existing-folder match is kept; otherwise the new-folder idea is suggested instead.
@@ -76,10 +77,21 @@ export async function classify(email: Email, catalog: Catalog): Promise<Predicti
 
 // Stored as a flat tag list; "ai:<model>" marks the email as processed even when nothing is suggested.
 // Earlier "rejected:" tags are kept: they count refusals and steer the next proposal.
+// A "keep" tag (set from the Nettoyage page) is kept too and blocks new delete suggestions.
 export function toTags(p: Prediction, previous: string[] = []): string[] {
   const d = decide(p);
-  return [...previous.filter((t) => t.startsWith("rejected:")), "ai:qwen2.5:14b", ...(d.folder ? [`folder:${d.folder}`] : []), ...(d.new_folder_idea ? [`new_folder_idea:${d.new_folder_idea}`] : [])];
+  const keep = previous.includes("keep");
+  return [
+    ...previous.filter((t) => t.startsWith("rejected:") || t === "keep"),
+    "ai:qwen2.5:14b",
+    ...(d.folder ? [`folder:${d.folder}`] : []),
+    ...(d.new_folder_idea ? [`new_folder_idea:${d.new_folder_idea}`] : []),
+    ...(p.delete_reason && !keep ? [`delete_suggested:${p.delete_reason}`] : []),
+  ];
 }
+
+// Emails refused this many times are offered for deletion on the Nettoyage page.
+export const REFUSALS_BEFORE_DELETE = 2;
 
 // Classifies the Inbox-root emails without a pending AI proposal: never-analysed first, then the ones
 // whose proposals were refused (fewest refusals first). `dry` returns predictions without writing.

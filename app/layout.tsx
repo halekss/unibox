@@ -46,6 +46,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <header>
           <Link href="/boite">Boîte unifiée</Link>
           <Link href="/">Propositions</Link>
+          <Link href="/nettoyage">Nettoyage</Link>
         </header>
         <main>{children}</main>
       </body>

@@ -6,7 +6,7 @@ const paths = new Set(["Boîte de réception/Candidatures"]);
 
 test("parses JSON wrapped in text or code fences", () => {
   const p = parsePrediction('Voici :\n```json\n{"folder": "Boîte de réception/Candidatures", "confidence": "haute", "new_folder_idea": null}\n```', paths);
-  assert.deepEqual(p, { folder: "Boîte de réception/Candidatures", confidence: "haute", new_folder_idea: null });
+  assert.deepEqual(p, { folder: "Boîte de réception/Candidatures", confidence: "haute", new_folder_idea: null, delete_reason: null });
 });
 
 test("unknown folder becomes null", () => {
@@ -30,4 +30,14 @@ test("previous refusals are kept when re-tagging", () => {
     "ai:qwen2.5:14b",
     "new_folder_idea:Epitech",
   ]);
+});
+
+test("delete suggestion is tagged unless the user chose to keep the email", () => {
+  const p = { folder: null, confidence: "basse", new_folder_idea: null, delete_reason: "code expiré" };
+  assert.deepEqual(toTags(p), ["ai:qwen2.5:14b", "delete_suggested:code expiré"]);
+  assert.deepEqual(toTags(p, ["keep"]), ["keep", "ai:qwen2.5:14b"]);
+});
+
+test("delete_reason is parsed", () => {
+  assert.equal(parsePrediction('{"folder": null, "confidence": "basse", "new_folder_idea": null, "delete_reason": "pub"}', paths).delete_reason, "pub");
 });

@@ -56,8 +56,8 @@ export async function analyzeInbox(_prev: null): Promise<null> {
   return null;
 }
 
-// Moves the email to Outlook's trash, then removes it from the app. Bound per email: deleteEmail.bind(null, id).
-export async function deleteEmail(id: number) {
+// Moves the email to Outlook's trash, then removes it from the app.
+async function trashOne(id: number) {
   const { rows } = await db.query(
     `SELECT e.external_id, a.* FROM emails e JOIN accounts a ON a.id = e.account_id WHERE e.id = $1`,
     [id],
@@ -77,6 +77,30 @@ export async function deleteEmail(id: number) {
     }
   }
   await db.query("DELETE FROM emails WHERE id = $1", [id]);
-  revalidatePath("/");
-  revalidatePath("/boite");
+}
+
+function refreshPages() {
+  for (const path of ["/", "/boite", "/nettoyage"]) revalidatePath(path);
+}
+
+// Bound per email: deleteEmail.bind(null, id).
+export async function deleteEmail(id: number) {
+  await trashOne(id);
+  refreshPages();
+}
+
+export async function deleteSelected(form: FormData) {
+  for (const id of form.getAll("ids").map(Number).filter(Number.isInteger)) await trashOne(id);
+  refreshPages();
+}
+
+// "keep" is permanent: the email is never offered for deletion again (see toTags).
+export async function keepSelected(form: FormData) {
+  const ids = form.getAll("ids").map(Number).filter(Number.isInteger);
+  await db.query(
+    `UPDATE emails SET tags = jsonb_path_query_array(tags, '$[*] ? (!(@ starts with "delete_suggested:"))') || '["keep"]'
+     WHERE id = ANY($1) AND NOT tags ? 'keep'`,
+    [ids],
+  );
+  refreshPages();
 }
