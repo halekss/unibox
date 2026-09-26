@@ -22,6 +22,7 @@ CREATE TABLE emails (
   provider    TEXT NOT NULL,
   external_id TEXT NOT NULL,
   folder      TEXT,
+  app_folder  TEXT,  -- folder confirmed in the app (overrides the Outlook folder)
   sender      TEXT,
   subject     TEXT,
   body_html   TEXT,
