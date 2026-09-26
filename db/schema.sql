@@ -5,8 +5,15 @@ CREATE TABLE accounts (
   access_token_enc TEXT NOT NULL,
   refresh_token_enc TEXT NOT NULL,
   expires_at       TIMESTAMPTZ NOT NULL,
-  delta_link       TEXT,
   UNIQUE (provider, email)
+);
+
+CREATE TABLE folders (
+  account_id  INT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  external_id TEXT NOT NULL,
+  path        TEXT NOT NULL,
+  delta_link  TEXT,
+  PRIMARY KEY (account_id, external_id)
 );
 
 CREATE TABLE emails (
@@ -14,6 +21,7 @@ CREATE TABLE emails (
   account_id  INT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   provider    TEXT NOT NULL,
   external_id TEXT NOT NULL,
+  folder      TEXT,
   sender      TEXT,
   subject     TEXT,
   body_html   TEXT,

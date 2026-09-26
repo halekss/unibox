@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db.ts";
-import { syncInbox } from "@/lib/microsoft.ts";
+import { syncAccount } from "@/lib/microsoft.ts";
 
 // ponytail: no auth on this route, local-only; add a session/API key before exposing the app anywhere.
 export async function POST() {
@@ -8,7 +8,7 @@ export async function POST() {
   const results = [];
   for (const acc of rows) {
     try {
-      results.push({ email: acc.email, ...(await syncInbox(acc)) });
+      results.push({ email: acc.email, ...(await syncAccount(acc)) });
     } catch (e) {
       results.push({ email: acc.email, error: (e as Error).message });
     }

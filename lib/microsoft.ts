@@ -71,7 +71,6 @@ type Account = {
   access_token_enc: string;
   refresh_token_enc: string;
   expires_at: Date;
-  delta_link: string | null;
 };
 
 // Refreshes when the access token has < 5 min left. Microsoft rotates refresh tokens, so both are re-saved.
@@ -95,7 +94,21 @@ type GraphMessage = {
   "@removed"?: unknown;
 };
 
-const PAGE = { Prefer: "odata.maxpagesize=50" };
+// ImmutableId: Outlook otherwise changes a message's id when it is moved between folders.
+const IMMUTABLE = 'IdType="ImmutableId"';
+const PAGE = { Prefer: `odata.maxpagesize=50, ${IMMUTABLE}` };
+
+// Inbox and all its subfolders, as "Boîte de réception/Parent/Child" paths.
+// ponytail: first 100 child folders per level; follow @odata.nextLink if a folder ever has more.
+async function listFolders(client: Client): Promise<{ id: string; path: string }[]> {
+  const inbox = await client.api("/me/mailFolders/inbox").select("id,displayName").get();
+  const out = [{ id: inbox.id as string, path: inbox.displayName as string }];
+  for (let i = 0; i < out.length; i++) {
+    const res = await client.api(`/me/mailFolders/${out[i].id}/childFolders`).select("id,displayName").top(100).get();
+    for (const f of res.value) out.push({ id: f.id, path: `${out[i].path}/${f.displayName}` });
+  }
+  return out;
+}
 
 // Graph returns one body format per request: delta gives HTML, plain text comes from a $batch (max 20 per call).
 async function fetchTextBodies(client: Client, ids: string[]): Promise<Map<string, string>> {
@@ -105,7 +118,7 @@ async function fetchTextBodies(client: Client, ids: string[]): Promise<Map<strin
       id,
       method: "GET",
       url: `/me/messages/${encodeURIComponent(id)}?$select=body`,
-      headers: { Prefer: 'outlook.body-content-type="text"' },
+      headers: { Prefer: `outlook.body-content-type="text", ${IMMUTABLE}` },
     }));
     const { responses } = await client.api("/$batch").post({ requests });
     for (const r of responses) if (r.status === 200) out.set(r.id, r.body.body.content);
@@ -113,25 +126,23 @@ async function fetchTextBodies(client: Client, ids: string[]): Promise<Map<strin
   return out;
 }
 
-// Full sync on first run, then incremental via the stored deltaLink. Progress (nextLink) is saved after
-// every page, so an interrupted sync resumes where it stopped.
-// ponytail: messages deleted/moved out of the Inbox ("@removed") are kept in the DB; decide the policy before deleting rows.
-export async function syncInbox(acc: Account): Promise<{ fetched: number; inserted: number }> {
-  const client = Client.init({
-    authProvider: (done) => getAccessToken(acc).then((t) => done(null, t), (e) => done(e, null)),
-  });
-  let fetched = 0;
-  let inserted = 0;
+type Stats = { fetched: number; inserted: number };
+
+// Full sync on first run, then incremental via the folder's stored deltaLink. Progress (nextLink) is saved
+// after every page, so an interrupted sync resumes where it stopped.
+// A message moved between synced folders keeps its id: the upsert only updates its folder.
+// ponytail: messages removed from synced folders ("@removed") are kept in the DB; decide the policy before deleting rows.
+async function syncFolder(client: Client, accountId: number, folder: { id: string; path: string }, deltaLink: string | null): Promise<Stats> {
+  const stats = { fetched: 0, inserted: 0 };
   let page;
   try {
-    page = acc.delta_link
-      ? await client.api(acc.delta_link).headers(PAGE).get()
-      : await client.api("/me/mailFolders/inbox/messages/delta").select("id,subject,receivedDateTime,from,body").headers(PAGE).get();
+    page = deltaLink
+      ? await client.api(deltaLink).headers(PAGE).get()
+      : await client.api(`/me/mailFolders/${folder.id}/messages/delta`).select("id,subject,receivedDateTime,from,body").headers(PAGE).get();
   } catch (e) {
-    // 410 Gone = delta token expired: restart a full sync (inserts are idempotent).
-    if ((e as { statusCode?: number }).statusCode !== 410 || !acc.delta_link) throw e;
-    acc.delta_link = null;
-    return syncInbox(acc);
+    // 410 Gone = delta token expired: restart a full sync of this folder (upserts are idempotent).
+    if ((e as { statusCode?: number }).statusCode !== 410 || !deltaLink) throw e;
+    return syncFolder(client, accountId, folder, null);
   }
 
   while (true) {
@@ -139,13 +150,15 @@ export async function syncInbox(acc: Account): Promise<{ fetched: number; insert
     const texts = await fetchTextBodies(client, messages.map((m) => m.id));
     for (const m of messages) {
       const from = m.from?.emailAddress;
-      const r = await db.query(
-        `INSERT INTO emails (account_id, provider, external_id, sender, subject, body_html, body_text, received_at)
-         VALUES ($1, 'outlook', $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (account_id, external_id) DO NOTHING`,
+      const { rows } = await db.query(
+        `INSERT INTO emails (account_id, provider, external_id, folder, sender, subject, body_html, body_text, received_at)
+         VALUES ($1, 'outlook', $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (account_id, external_id) DO UPDATE SET folder = EXCLUDED.folder
+         RETURNING (xmax = 0) AS inserted`,
         [
-          acc.id,
+          accountId,
           m.id,
+          folder.path,
           from ? (from.name ? `${from.name} <${from.address}>` : from.address) : null,
           m.subject,
           m.body.contentType === "html" ? m.body.content : null,
@@ -153,14 +166,34 @@ export async function syncInbox(acc: Account): Promise<{ fetched: number; insert
           m.receivedDateTime,
         ],
       );
-      inserted += r.rowCount ?? 0;
+      if (rows[0].inserted) stats.inserted++;
     }
-    fetched += messages.length;
+    stats.fetched += messages.length;
 
     const link: string = page["@odata.nextLink"] ?? page["@odata.deltaLink"];
-    await db.query("UPDATE accounts SET delta_link = $1 WHERE id = $2", [link, acc.id]);
+    await db.query("UPDATE folders SET delta_link = $1 WHERE account_id = $2 AND external_id = $3", [link, accountId, folder.id]);
     if (!page["@odata.nextLink"]) break;
     page = await client.api(link).headers(PAGE).get();
   }
-  return { fetched, inserted };
+  return stats;
+}
+
+export async function syncAccount(acc: Account): Promise<Stats & { folders: number }> {
+  const client = Client.init({
+    authProvider: (done) => getAccessToken(acc).then((t) => done(null, t), (e) => done(e, null)),
+  });
+  const total = { folders: 0, fetched: 0, inserted: 0 };
+  for (const folder of await listFolders(client)) {
+    const { rows } = await db.query(
+      `INSERT INTO folders (account_id, external_id, path) VALUES ($1, $2, $3)
+       ON CONFLICT (account_id, external_id) DO UPDATE SET path = EXCLUDED.path
+       RETURNING delta_link`,
+      [acc.id, folder.id, folder.path],
+    );
+    const s = await syncFolder(client, acc.id, folder, rows[0].delta_link);
+    total.folders++;
+    total.fetched += s.fetched;
+    total.inserted += s.inserted;
+  }
+  return total;
 }
