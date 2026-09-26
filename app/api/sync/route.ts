@@ -3,7 +3,7 @@ import { db } from "@/lib/db.ts";
 import { mailbox } from "@/lib/mailbox.ts";
 
 // Syncs every connected account (Outlook and Gmail).
-// ponytail: no auth on this route, local-only; add a session/API key before exposing the app anywhere.
+// Protected by proxy.ts (password + same-origin check).
 export async function POST() {
   const { rows } = await db.query("SELECT * FROM accounts ORDER BY id");
   const results = [];

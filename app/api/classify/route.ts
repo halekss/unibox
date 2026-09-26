@@ -5,7 +5,6 @@ import { classify, decide, folderCatalog, tagInbox } from "@/lib/classify.ts";
 // ?eval=N : classifies N random already-sorted emails and reports accuracy, without writing anything.
 // Default : tags the untagged emails sitting at the Inbox root (max ?limit=, default 20).
 // &dry=1 : returns the predictions without writing tags.
-// ponytail: no auth, local-only (same as /api/sync).
 export async function POST(req: NextRequest) {
   const p = req.nextUrl.searchParams;
   const evalN = Number(p.get("eval") ?? 0);
