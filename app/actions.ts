@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db.ts";
 import { scanFoldersForCleanup, tagInbox } from "@/lib/classify.ts";
-import { applyAppFolders, trashMessage } from "@/lib/microsoft.ts";
+import { applyAppFolders, trashEmail } from "@/lib/mailbox.ts";
 
 function selection(form: FormData) {
   return { tag: String(form.get("tag")), ids: form.getAll("ids").map(Number).filter(Number.isInteger) };
@@ -65,41 +65,18 @@ export async function scanForCleanup(_prev: null): Promise<null> {
   return runBatch(() => scanFoldersForCleanup(20));
 }
 
-// Moves the email to Outlook's trash, then removes it from the app.
-async function trashOne(id: number) {
-  const { rows } = await db.query(
-    `SELECT e.external_id, a.* FROM emails e JOIN accounts a ON a.id = e.account_id WHERE e.id = $1`,
-    [id],
-  );
-  if (!rows[0]) return;
-  try {
-    await trashMessage(rows[0], rows[0].external_id);
-  } catch (e) {
-    const status = (e as { statusCode?: number }).statusCode;
-    // 404: already gone from the mailbox, so removing it from the app is still right.
-    if (status !== 404) {
-      throw new Error(
-        status === 403 || /invalid_grant|consent/i.test((e as Error).message)
-          ? "Permission Outlook manquante : reconnecte-toi via /api/auth/login pour accepter Mail.ReadWrite."
-          : `Suppression dans Outlook impossible : ${(e as Error).message}`,
-      );
-    }
-  }
-  await db.query("DELETE FROM emails WHERE id = $1", [id]);
-}
-
 function refreshPages() {
   for (const path of ["/", "/boite", "/nettoyage"]) revalidatePath(path);
 }
 
 // Bound per email: deleteEmail.bind(null, id).
 export async function deleteEmail(id: number) {
-  await trashOne(id);
+  await trashEmail(id);
   refreshPages();
 }
 
 export async function deleteSelected(form: FormData) {
-  for (const id of form.getAll("ids").map(Number).filter(Number.isInteger)) await trashOne(id);
+  for (const id of form.getAll("ids").map(Number).filter(Number.isInteger)) await trashEmail(id);
   refreshPages();
 }
 

@@ -17,7 +17,7 @@ export default async function Inbox({ searchParams }: { searchParams: Promise<{ 
   // Inbox first, then alphabetical on the displayed name (Outlook paths and app folders mixed).
   folders.sort((a, b) => Number(b.f === INBOX) - Number(a.f === INBOX) || label(a.f).localeCompare(label(b.f), "fr"));
   const { rows: emails } = await db.query(
-    `SELECT id, subject, sender, received_at, left(body_text, 5000) AS body, tags FROM emails
+    `SELECT id, provider, subject, sender, received_at, left(body_text, 5000) AS body, tags FROM emails
      WHERE ${EFFECTIVE_FOLDER} = $1 ORDER BY received_at DESC LIMIT 200`,
     [selected],
   );
@@ -55,6 +55,7 @@ export default async function Inbox({ searchParams }: { searchParams: Promise<{ 
                 <li key={e.id} className="row">
                   <details>
                     <summary>
+                      <span className="badge">{e.provider === "gmail" ? "Gmail" : "Outlook"}</span>{" "}
                       <strong>{e.subject || "(sans objet)"}</strong>{" "}
                       <span className="muted">
                         — {e.sender?.replace(/<.*>/, "").trim()} · {e.received_at.toLocaleDateString("fr-FR")}

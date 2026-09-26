@@ -1,6 +1,6 @@
 import { Client } from "@microsoft/microsoft-graph-client";
 import { db } from "./db.ts";
-import { encrypt, decrypt } from "./crypto.ts";
+import { type Account, freshToken, postToken, saveTokens } from "./accounts.ts";
 import { INBOX } from "./classify.ts";
 
 const AUTHORITY = "https://login.microsoftonline.com/consumers/oauth2/v2.0";
@@ -19,40 +19,16 @@ export function authorizeUrl(state: string): string {
   return `${AUTHORITY}/authorize?${q}`;
 }
 
-type TokenResponse = { access_token: string; refresh_token: string; expires_in: number };
-
-async function tokenRequest(params: Record<string, string>): Promise<TokenResponse> {
-  const res = await fetch(`${AUTHORITY}/token`, {
-    method: "POST",
-    body: new URLSearchParams({
-      client_id: process.env.MS_CLIENT_ID!,
-      client_secret: process.env.MS_CLIENT_SECRET!,
-      scope: SCOPES,
-      ...params,
-    }),
+const tokenRequest = (params: Record<string, string>) =>
+  postToken(`${AUTHORITY}/token`, {
+    client_id: process.env.MS_CLIENT_ID!,
+    client_secret: process.env.MS_CLIENT_SECRET!,
+    scope: SCOPES,
+    ...params,
   });
-  const json = await res.json();
-  // Only the error code/description is surfaced: never the raw body (it can echo tokens).
-  if (!res.ok) throw new Error(`Token endpoint: ${json.error}: ${json.error_description}`);
-  return json;
-}
 
 function graph(accessToken: string): Client {
   return Client.init({ authProvider: (done) => done(null, accessToken) });
-}
-
-async function saveTokens(email: string, t: TokenResponse): Promise<number> {
-  const { rows } = await db.query(
-    `INSERT INTO accounts (provider, email, access_token_enc, refresh_token_enc, expires_at)
-     VALUES ('outlook', $1, $2, $3, now() + make_interval(secs => $4))
-     ON CONFLICT (provider, email) DO UPDATE SET
-       access_token_enc = EXCLUDED.access_token_enc,
-       refresh_token_enc = EXCLUDED.refresh_token_enc,
-       expires_at = EXCLUDED.expires_at
-     RETURNING id`,
-    [email, encrypt(t.access_token), encrypt(t.refresh_token), t.expires_in],
-  );
-  return rows[0].id;
 }
 
 export async function connectAccount(code: string): Promise<string> {
@@ -63,29 +39,13 @@ export async function connectAccount(code: string): Promise<string> {
   });
   const me = await graph(t.access_token).api("/me").select("mail,userPrincipalName").get();
   const email: string = me.mail ?? me.userPrincipalName;
-  await saveTokens(email, t);
+  await saveTokens("outlook", email, t);
   return email;
 }
 
-type Account = {
-  id: number;
-  email: string;
-  access_token_enc: string;
-  refresh_token_enc: string;
-  expires_at: Date;
-};
-
-// Refreshes when the access token has < 5 min left. Microsoft rotates refresh tokens, so both are re-saved.
-// `acc` is updated in place so a long sync keeps using the fresh token.
-export async function getAccessToken(acc: Account): Promise<string> {
-  if (acc.expires_at.getTime() - Date.now() > 5 * 60_000) return decrypt(acc.access_token_enc);
-  const t = await tokenRequest({ grant_type: "refresh_token", refresh_token: decrypt(acc.refresh_token_enc) });
-  await saveTokens(acc.email, t);
-  acc.access_token_enc = encrypt(t.access_token);
-  acc.refresh_token_enc = encrypt(t.refresh_token);
-  acc.expires_at = new Date(Date.now() + t.expires_in * 1000);
-  return t.access_token;
-}
+// Microsoft rotates refresh tokens: freshToken re-saves both.
+export const getAccessToken = (acc: Account) =>
+  freshToken(acc, (refresh_token) => tokenRequest({ grant_type: "refresh_token", refresh_token }));
 
 // Graph client that refreshes the account's token as needed (safe for long runs).
 function clientFor(acc: Account): Client {
@@ -250,36 +210,10 @@ async function ensureFolder(client: Client, path: string): Promise<string> {
   return id;
 }
 
-// App folder name -> Outlook path: "Epitech" -> "Boîte de réception/Epitech"; full paths are kept.
-export const outlookPath = (name: string) => (name === INBOX || name.startsWith(`${INBOX}/`) ? name : `${INBOX}/${name}`);
-
-// Applies app folders to Outlook: creates the folder if needed and moves the email there. On success the
-// email's folder becomes the Outlook path and app_folder is cleared; on failure app_folder stays (retry later).
-export async function applyAppFolders(ids?: number[]): Promise<{ moved: number; failed: { id: number; error: string }[] }> {
-  const { rows } = await db.query(
-    `SELECT e.id AS email_id, e.external_id, e.app_folder,
-            a.id, a.email, a.access_token_enc, a.refresh_token_enc, a.expires_at
-     FROM emails e JOIN accounts a ON a.id = e.account_id
-     WHERE e.app_folder IS NOT NULL AND ($1::int[] IS NULL OR e.id = ANY($1))`,
-    [ids ?? null],
-  );
-  const clients = new Map<number, Client>();
-  const folderIds = new Map<string, string>();
-  const result = { moved: 0, failed: [] as { id: number; error: string }[] };
-  for (const r of rows) {
-    try {
-      const acc: Account = r;
-      if (!clients.has(acc.id)) clients.set(acc.id, clientFor(acc));
-      const client = clients.get(acc.id)!;
-      const path = outlookPath(r.app_folder);
-      const key = `${acc.id}:${path}`;
-      if (!folderIds.has(key)) folderIds.set(key, await ensureFolder(client, path));
-      await client.api(`/me/messages/${encodeURIComponent(r.external_id)}/move`).header("Prefer", IMMUTABLE).post({ destinationId: folderIds.get(key) });
-      await db.query("UPDATE emails SET folder = $1, app_folder = NULL WHERE id = $2", [path, r.email_id]);
-      result.moved++;
-    } catch (e) {
-      result.failed.push({ id: r.email_id, error: (e as Error).message });
-    }
-  }
-  return result;
+// Moves the message to the Outlook folder at `path`, creating it if needed. `folderIds` caches path -> id
+// for the duration of one batch.
+export async function moveToFolder(acc: Account, externalId: string, path: string, folderIds: Map<string, string>): Promise<void> {
+  const client = clientFor(acc);
+  if (!folderIds.has(path)) folderIds.set(path, await ensureFolder(client, path));
+  await client.api(`/me/messages/${encodeURIComponent(externalId)}/move`).header("Prefer", IMMUTABLE).post({ destinationId: folderIds.get(path) });
 }

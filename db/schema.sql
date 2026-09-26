@@ -5,6 +5,7 @@ CREATE TABLE accounts (
   access_token_enc TEXT NOT NULL,
   refresh_token_enc TEXT NOT NULL,
   expires_at       TIMESTAMPTZ NOT NULL,
+  sync_cursor      TEXT,  -- Gmail historyId (Outlook keeps one deltaLink per folder in `folders`)
   UNIQUE (provider, email)
 );
 
