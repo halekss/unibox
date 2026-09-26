@@ -10,7 +10,9 @@ export function proxy(req: NextRequest) {
       status: 401,
       headers: { "WWW-Authenticate": 'Basic realm="Unified Inbox", charset="UTF-8"' },
     });
-  if (!isSameOrigin(req.method, req.headers.get("origin"), req.headers.get("host")))
+  // Behind Tailscale serve the public host may only be in X-Forwarded-Host (browsers cannot forge it cross-site).
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  if (!isSameOrigin(req.method, req.headers.get("origin"), host))
     return new NextResponse("Origine refusée", { status: 403 });
   return NextResponse.next();
 }
