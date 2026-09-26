@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isAuthorized, isSameOrigin } from "./auth.ts";
+import { isAuthorized, isSameOrigin, safeBack } from "./auth.ts";
 
 const basic = (s: string) => `Basic ${Buffer.from(s).toString("base64")}`;
 
@@ -21,4 +21,12 @@ test("isSameOrigin: foreign POSTs are refused", () => {
   assert.equal(isSameOrigin("POST", "null", "localhost:3000"), false);
   assert.equal(isSameOrigin("POST", null, "localhost:3000"), true);
   assert.equal(isSameOrigin("GET", "https://evil.example", "localhost:3000"), true);
+});
+
+test("safeBack: only same-site paths", () => {
+  assert.equal(safeBack("/boite?dossier=Epitech"), "/boite?dossier=Epitech");
+  assert.equal(safeBack("//evil.example"), "/");
+  assert.equal(safeBack("/\\evil.example"), "/");
+  assert.equal(safeBack("https://evil.example"), "/");
+  assert.equal(safeBack(null), "/");
 });

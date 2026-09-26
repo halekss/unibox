@@ -220,6 +220,13 @@ export async function trashMessage(acc: Account, externalId: string): Promise<vo
 
 // "Moving" in Gmail = adding the folder's label and leaving the Inbox. The label is created if missing.
 export async function moveToFolder(acc: Account, externalId: string, path: string, labelIds: Map<string, string>): Promise<void> {
+  // Back to the Inbox root (undo): Inbox label on, user labels off (a labelled message counts as filed).
+  if (path === INBOX) {
+    const m = await api(acc, `/messages/${externalId}?format=minimal`);
+    const userLabels = (m.labelIds ?? []).filter((l: string) => l.startsWith("Label_"));
+    await api(acc, `/messages/${externalId}/modify`, { method: "POST", body: JSON.stringify({ addLabelIds: ["INBOX"], removeLabelIds: userLabels }) });
+    return;
+  }
   if (!labelIds.has(path)) {
     const name = path.slice(INBOX.length + 1);
     const { labels } = await api(acc, "/labels");

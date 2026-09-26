@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db.ts";
+import { safeBack } from "@/lib/auth.ts";
 import { scanFoldersForCleanup, tagInbox } from "@/lib/classify.ts";
-import { applyAppFolders, syncAll, trashEmail } from "@/lib/mailbox.ts";
+import { applyAppFolders, returnToInbox, syncAll, trashEmail } from "@/lib/mailbox.ts";
 
 function selection(form: FormData) {
   return { tag: String(form.get("tag")), ids: form.getAll("ids").map(Number).filter(Number.isInteger) };
@@ -19,6 +21,28 @@ export async function confirmProposal(form: FormData) {
   const { failed } = await applyAppFolders(ids);
   refreshPages();
   if (failed.length) throw new Error(`Rangé dans l'app, mais ${failed.length} mail(s) non déplacé(s) dans leur boîte : ${failed[0].error}`);
+  // Back to the page the form came from, with what the undo toast needs.
+  const u = new URLSearchParams({ range: name.replace(/^Boîte de réception\//, ""), undo: ids.join(","), tag });
+  redirect(`${backPath(form)}${backPath(form).includes("?") ? "&" : "?"}${u}`);
+}
+
+const backPath = (form: FormData) => safeBack(form.get("back"));
+
+// Undo toast: the emails go back to the Inbox root with their proposal.
+export async function undoFiling(form: FormData) {
+  const ids = String(form.get("undo") ?? "").split(",").map(Number).filter(Number.isInteger);
+  const tag = String(form.get("tag") ?? "");
+  if (ids.length === 0 || !/^(folder|new_folder_idea):/.test(tag)) return;
+  const { failed } = await returnToInbox(ids, tag);
+  refreshPages();
+  if (failed) throw new Error(`${failed} mail(s) n'ont pas pu revenir dans la Boîte de réception.`);
+  redirect(backPath(form));
+}
+
+// Removes the account and its local copies from the app (cascade). The mailbox itself is not touched.
+export async function disconnectAccount(id: number) {
+  await db.query("DELETE FROM accounts WHERE id = $1", [id]);
+  refreshPages();
 }
 
 // Retries every email filed in the app but not yet moved in its mailbox.

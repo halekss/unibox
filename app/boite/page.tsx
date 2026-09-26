@@ -8,7 +8,7 @@ import { PendingButton } from "../Pending.tsx";
 
 export const dynamic = "force-dynamic";
 
-type Params = { dossier?: string; id?: string; p?: string; q?: string; ai?: string };
+type Params = { dossier?: string; id?: string; p?: string; q?: string; ai?: string; range?: string; undo?: string; tag?: string };
 
 const proposalOf = (tags: string[]) => tags.find((t) => t.startsWith("folder:") || t.startsWith("new_folder_idea:"));
 const label = (tag: string) => tag.slice(tag.indexOf(":") + 1).replace(`${INBOX}/`, "");
@@ -37,9 +37,10 @@ export default async function Inbox({ searchParams }: { searchParams: Promise<Pa
     ? await db.query("SELECT id, provider, subject, sender, received_at, body_text, tags FROM emails WHERE id = $1", [selectedId])
     : { rows: [] };
 
-  // Keeps the current filters when changing one of them.
+  // Keeps the current filters when changing one of them (never the undo toast's parameters).
   const href = (over: Partial<Params>) => {
-    const u = new URLSearchParams(Object.entries({ ...sp, ...over }).filter(([, v]) => v) as [string, string][]);
+    const all = { ...sp, ...over, range: undefined, undo: undefined, tag: undefined };
+    const u = new URLSearchParams(Object.entries(all).filter(([, v]) => v) as [string, string][]);
     return `/boite?${u}`;
   };
   const proposal = mail && proposalOf(mail.tags);
@@ -103,6 +104,7 @@ export default async function Inbox({ searchParams }: { searchParams: Promise<Pa
                 <input type="hidden" name="tag" value={proposal} />
                 <input type="hidden" name="name" value={label(proposal)} />
                 <input type="hidden" name="ids" value={mail.id} />
+                <input type="hidden" name="back" value={href({ id: undefined })} />
                 <Icon name="sort" size={20} />
                 <span>
                   L'IA propose de ranger ce mail dans <strong>{label(proposal)}</strong>

@@ -1,6 +1,7 @@
 import { db } from "@/lib/db.ts";
 import { FOLDER_LABEL, INBOX, langflowUp } from "@/lib/classify.ts";
-import { syncNow } from "../actions.ts";
+import { disconnectAccount, syncNow } from "../actions.ts";
+import { ConfirmButton } from "../ConfirmButton.tsx";
 import { Icon } from "../Icons.tsx";
 import { PendingButton } from "../Pending.tsx";
 
@@ -52,9 +53,19 @@ export default async function Accounts() {
               <span className="small muted">
                 {gmail ? "Boîte de réception (onglets compris) et libellés." : "Boîte de réception et ses sous-dossiers."} Lecture, rangement et corbeille autorisés.
               </span>
-              <form action={syncNow}>
-                <PendingButton busy="Synchro…">Synchroniser</PendingButton>
-              </form>
+              <div style={{ display: "flex", gap: 8 }}>
+                <form action={syncNow}>
+                  <PendingButton busy="Synchro…">Synchroniser</PendingButton>
+                </form>
+                <form action={disconnectAccount.bind(null, a.id)}>
+                  <ConfirmButton
+                    className="btn link-danger"
+                    message={`Déconnecter ${a.email} ?\n\nUnibox oublie ce compte et efface ses ${a.mails} copies locales (propositions et tris en attente compris). Tes mails restent intacts dans ta boîte ${gmail ? "Gmail" : "Outlook"}.`}
+                  >
+                    Déconnecter
+                  </ConfirmButton>
+                </form>
+              </div>
             </div>
           );
         })}

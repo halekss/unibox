@@ -90,6 +90,7 @@ export default async function Proposals({ searchParams }: { searchParams: Promis
             {/* First submit button = what Enter in the name field does: rank, never the row "Supprimer". */}
             <button hidden formAction={confirmProposal} tabIndex={-1} aria-hidden="true" />
             <input type="hidden" name="tag" value={tag} />
+            <input type="hidden" name="back" value="/" />
             <div className="detail-head">
               <label>
                 <span className="muted" style={{ fontSize: 15, whiteSpace: "nowrap" }}>Ranger dans</span>

@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { Schibsted_Grotesk } from "next/font/google";
 import { Sidebar } from "./Sidebar.tsx";
+import { UndoToast } from "./UndoToast.tsx";
 
 export const metadata = { title: "Unibox" };
 
@@ -148,6 +149,7 @@ kbd { font-family:inherit; font-size:12px; font-weight:700; background:#fff; bor
 .mrow time { font-size:12px; color:var(--muted); text-align:right; }
 .mrow details { grid-column:3 / -1; }
 .mrow summary { cursor:pointer; color:var(--muted); font-size:12px; }
+.mrow.clean { grid-template-columns:18px 16px 170px minmax(0,1fr) auto 64px; }
 .mrow pre { white-space:pre-wrap; font:inherit; font-size:13px; color:var(--muted); margin:6px 0 0; max-height:260px; overflow:auto; }
 
 /* À supprimer */
@@ -185,6 +187,18 @@ kbd { font-family:inherit; font-size:12px; font-weight:700; background:#fff; bor
 code.cmd { display:block; background:var(--night); color:#E8E6F5; border-radius:8px; padding:12px 14px; font-size:13px; line-height:1.5; white-space:pre-wrap; word-break:break-all; }
 .facts div { display:flex; justify-content:space-between; gap:12px; }
 
+/* Undo toast */
+.toast { position:fixed; left:50%; bottom:28px; transform:translateX(-50%); z-index:20; display:flex; align-items:center; gap:14px;
+  background:var(--night); color:#fff; border-radius:10px; padding:10px 10px 10px 18px; box-shadow:0 8px 24px rgba(28,26,51,.25); }
+.toast-undo { border:0; background:transparent; color:var(--accent-on-night); font-weight:700; padding:6px 8px; cursor:pointer; border-radius:6px; }
+.toast-undo:hover { background:var(--night-2); }
+.toast-close { border:0; background:transparent; color:var(--on-night-2); font-size:18px; line-height:1; padding:4px 8px; cursor:pointer; border-radius:6px; }
+
+/* Segmented tabs */
+.tabs { display:flex; background:#E2E1EC; border-radius:10px; padding:3px; }
+.tabs a { border-radius:8px; padding:7px 14px; font-weight:500; color:var(--muted); }
+.tabs a[aria-current] { background:#fff; color:var(--text); font-weight:700; }
+
 /* Narrow screens and phone */
 @media (max-width:900px) {
   .inbox { grid-template-columns:1fr; }
@@ -200,6 +214,7 @@ code.cmd { display:block; background:var(--night); color:#E8E6F5; border-radius:
   .gactions { grid-column:1 / -1; justify-content:flex-start; }
   .mrow { grid-template-columns:18px 16px minmax(0,1fr) auto; }
   .mrow .subj, .mrow time { display:none; }
+  .mrow.clean { grid-template-columns:18px 16px minmax(0,1fr) auto; }
 }
 @media (max-width:760px) {
   .app { flex-direction:column; }
@@ -215,6 +230,7 @@ code.cmd { display:block; background:var(--night); color:#E8E6F5; border-radius:
   h1 { font-size:28px; }
   .reader { padding:20px 16px; }
   .keys { display:none; }
+  .toast { bottom:84px; max-width:calc(100% - 32px); }
 }
 `;
 
@@ -226,6 +242,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <div className="app">
           <Sidebar />
           <main className="content">{children}</main>
+          <Suspense>
+            <UndoToast />
+          </Suspense>
         </div>
       </body>
     </html>

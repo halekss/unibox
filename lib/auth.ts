@@ -21,3 +21,10 @@ export function isSameOrigin(method: string, origin: string | null, host: string
     return false;
   }
 }
+
+// Redirect target taken from a form field: same-site paths only ("/boite?dossier=X"), never "//evil.example"
+// or "/\evil.example" (browsers read both as another host).
+export function safeBack(b: unknown): string {
+  const s = typeof b === "string" ? b : "";
+  return /^\/(?![/\\])/.test(s) ? s : "/";
+}

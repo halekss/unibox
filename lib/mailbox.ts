@@ -63,6 +63,36 @@ export async function applyAppFolders(ids?: number[]): Promise<{ moved: number; 
   return result;
 }
 
+// Undo of a filing: moves the emails back to the Inbox root (mailbox and app) and gives them back their
+// proposal tag, so they reappear in À ranger. Emails whose move never reached the mailbox are only reset in the app.
+export async function returnToInbox(ids: number[], tag: string): Promise<{ failed: number }> {
+  const { rows } = await db.query(
+    `SELECT e.id AS email_id, e.external_id, e.folder, e.app_folder, ${ACCOUNT_COLUMNS}
+     FROM emails e JOIN accounts a ON a.id = e.account_id WHERE e.id = ANY($1)`,
+    [ids],
+  );
+  const caches = new Map<number, Map<string, string>>();
+  let failed = 0;
+  for (const r of rows) {
+    try {
+      const acc: Account = r;
+      if (r.folder !== INBOX) {
+        if (!caches.has(acc.id)) caches.set(acc.id, new Map());
+        await mailbox(acc).moveToFolder(acc, r.external_id, INBOX, caches.get(acc.id)!);
+      }
+      await db.query(
+        `UPDATE emails SET folder = $1, app_folder = NULL,
+                tags = CASE WHEN tags ? $2 THEN tags ELSE tags || jsonb_build_array($2::text) END
+         WHERE id = $3`,
+        [INBOX, tag, r.email_id],
+      );
+    } catch {
+      failed++;
+    }
+  }
+  return { failed };
+}
+
 // Sends the email to the mailbox's trash (recoverable), then removes it from the app.
 export async function trashEmail(id: number): Promise<void> {
   const { rows } = await db.query(
