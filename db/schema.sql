@@ -5,6 +5,7 @@ CREATE TABLE accounts (
   access_token_enc TEXT NOT NULL,
   refresh_token_enc TEXT NOT NULL,
   expires_at       TIMESTAMPTZ NOT NULL,
+  delta_link       TEXT,
   UNIQUE (provider, email)
 );
 
