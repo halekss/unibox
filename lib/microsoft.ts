@@ -126,14 +126,14 @@ async function fetchTextBodies(client: Client, ids: string[]): Promise<Map<strin
   return out;
 }
 
-type Stats = { fetched: number; inserted: number };
+type Stats = { fetched: number; inserted: number; removed: string[] };
 
 // Full sync on first run, then incremental via the folder's stored deltaLink. Progress (nextLink) is saved
 // after every page, so an interrupted sync resumes where it stopped.
 // A message moved between synced folders keeps its id: the upsert only updates its folder.
-// ponytail: messages removed from synced folders ("@removed") are kept in the DB; decide the policy before deleting rows.
+// Ids reported "@removed" are returned, not deleted here: see syncAccount.
 async function syncFolder(client: Client, accountId: number, folder: { id: string; path: string }, deltaLink: string | null): Promise<Stats> {
-  const stats = { fetched: 0, inserted: 0 };
+  const stats: Stats = { fetched: 0, inserted: 0, removed: [] };
   let page;
   try {
     page = deltaLink
@@ -141,12 +141,15 @@ async function syncFolder(client: Client, accountId: number, folder: { id: strin
       : await client.api(`/me/mailFolders/${folder.id}/messages/delta`).select("id,subject,receivedDateTime,from,body").headers(PAGE).get();
   } catch (e) {
     // 410 Gone = delta token expired: restart a full sync of this folder (upserts are idempotent).
+    // ponytail: a full resync does not report removals, so mails deleted meanwhile stay in the DB.
     if ((e as { statusCode?: number }).statusCode !== 410 || !deltaLink) throw e;
     return syncFolder(client, accountId, folder, null);
   }
 
   while (true) {
-    const messages = (page.value as GraphMessage[]).filter((m) => !("@removed" in m));
+    const value = page.value as GraphMessage[];
+    stats.removed.push(...value.filter((m) => "@removed" in m).map((m) => m.id));
+    const messages = value.filter((m) => !("@removed" in m));
     const texts = await fetchTextBodies(client, messages.map((m) => m.id));
     for (const m of messages) {
       const from = m.from?.emailAddress;
@@ -178,22 +181,44 @@ async function syncFolder(client: Client, accountId: number, folder: { id: strin
   return stats;
 }
 
-export async function syncAccount(acc: Account): Promise<Stats & { folders: number }> {
+export async function syncAccount(acc: Account) {
   const client = Client.init({
     authProvider: (done) => getAccessToken(acc).then((t) => done(null, t), (e) => done(e, null)),
   });
-  const total = { folders: 0, fetched: 0, inserted: 0 };
+  const total = { folders: 0, fetched: 0, inserted: 0, deleted: 0 };
+  const { rows: known } = await db.query("SELECT external_id, path, delta_link FROM folders WHERE account_id = $1", [acc.id]);
+  const knownById = new Map(known.map((f) => [f.external_id as string, f]));
+  const removed: { id: string; path: string }[] = [];
+
   for (const folder of await listFolders(client)) {
-    const { rows } = await db.query(
-      `INSERT INTO folders (account_id, external_id, path) VALUES ($1, $2, $3)
-       ON CONFLICT (account_id, external_id) DO UPDATE SET path = EXCLUDED.path
-       RETURNING delta_link`,
-      [acc.id, folder.id, folder.path],
-    );
-    const s = await syncFolder(client, acc.id, folder, rows[0].delta_link);
+    const prev = knownById.get(folder.id);
+    knownById.delete(folder.id);
+    if (!prev) {
+      await db.query("INSERT INTO folders (account_id, external_id, path) VALUES ($1, $2, $3)", [acc.id, folder.id, folder.path]);
+    } else if (prev.path !== folder.path) {
+      // Renamed (or parent renamed): delta does not resend unchanged messages, so relabel them here.
+      await db.query("UPDATE folders SET path = $1 WHERE account_id = $2 AND external_id = $3", [folder.path, acc.id, folder.id]);
+      await db.query("UPDATE emails SET folder = $1 WHERE account_id = $2 AND folder = $3", [folder.path, acc.id, prev.path]);
+    }
+    const s = await syncFolder(client, acc.id, folder, prev?.delta_link ?? null);
+    removed.push(...s.removed.map((id) => ({ id, path: folder.path })));
     total.folders++;
     total.fetched += s.fetched;
     total.inserted += s.inserted;
+  }
+
+  // Deletions run after every folder is synced: a message moved to another synced folder has already been
+  // relabelled there, so the `folder = path` guard keeps it (and its tags).
+  // ponytail: if the sync crashes before this point, those removals are lost (rows stay); persist them if that matters.
+  for (const r of removed) {
+    const res = await db.query("DELETE FROM emails WHERE account_id = $1 AND external_id = $2 AND folder = $3", [acc.id, r.id, r.path]);
+    total.deleted += res.rowCount ?? 0;
+  }
+  // Folders gone from the Inbox tree (deleted, or moved out): drop them and their mails.
+  for (const f of knownById.values()) {
+    const res = await db.query("DELETE FROM emails WHERE account_id = $1 AND folder = $2", [acc.id, f.path]);
+    await db.query("DELETE FROM folders WHERE account_id = $1 AND external_id = $2", [acc.id, f.external_id]);
+    total.deleted += res.rowCount ?? 0;
   }
   return total;
 }
