@@ -51,6 +51,9 @@ export function decide(p: Prediction): { folder: string | null; new_folder_idea:
   return p.folder && p.confidence === "haute" ? { folder: p.folder, new_folder_idea: null } : { folder: null, new_folder_idea: p.new_folder_idea };
 }
 
+export const LANGFLOW_DOWN = "Langflow ne répond pas";
+const LANGFLOW_START = "LANGFLOW_OPEN_BROWSER=false ~/ProjetsWSL/langflow/.venv/bin/langflow run --host 127.0.0.1 --port 7860";
+
 export async function classify(email: Email, catalog: Catalog): Promise<Prediction> {
   const input = [
     "Dossiers :",
@@ -69,6 +72,9 @@ export async function classify(email: Email, catalog: Catalog): Promise<Predicti
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": process.env.LANGFLOW_API_KEY! },
     body: JSON.stringify({ input_value: input.join("\n"), input_type: "chat", output_type: "chat" }),
+  }).catch(() => {
+    // Network-level failure (refused, timeout): Langflow is not running, which the raw "fetch failed" hides.
+    throw new Error(`${LANGFLOW_DOWN} (${process.env.LANGFLOW_URL}). Lance-le : ${LANGFLOW_START}`);
   });
   if (!res.ok) throw new Error(`Langflow ${res.status}: ${(await res.text()).slice(0, 300)}`);
   const json = await res.json();

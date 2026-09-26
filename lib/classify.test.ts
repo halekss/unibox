@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseOrNothing, parsePrediction, toTags } from "./classify.ts";
+import { classify, LANGFLOW_DOWN, parseOrNothing, parsePrediction, toTags } from "./classify.ts";
 
 const paths = new Set(["Boîte de réception/Candidatures"]);
 
@@ -44,4 +44,10 @@ test("delete_reason is parsed", () => {
 
 test("malformed JSON counts as no opinion instead of failing the run", () => {
   assert.deepEqual(parseOrNothing('{"folder" null}', paths), { folder: null, confidence: null, new_folder_idea: null, delete_reason: null });
+});
+
+test("classify: Langflow down gives an actionable message, not 'fetch failed'", async () => {
+  process.env.LANGFLOW_URL = "http://127.0.0.1:1"; // nothing listens on port 1
+  const email = { id: 1, sender: "a", subject: "b", body_text: "c", tags: [] } as any;
+  await assert.rejects(classify(email, { text: "", paths: new Set() } as any), (e: Error) => e.message.startsWith(LANGFLOW_DOWN));
 });
