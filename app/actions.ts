@@ -3,30 +3,29 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db.ts";
 import { scanFoldersForCleanup, tagInbox } from "@/lib/classify.ts";
-import { applyAppFolders, trashEmail } from "@/lib/mailbox.ts";
+import { applyAppFolders, syncAll, trashEmail } from "@/lib/mailbox.ts";
 
 function selection(form: FormData) {
   return { tag: String(form.get("tag")), ids: form.getAll("ids").map(Number).filter(Number.isInteger) };
 }
 
 // Files the checked emails into the (possibly renamed) folder: recorded in the app first, then created and
-// moved in Outlook. Emails Outlook refused stay filed in the app with an "à appliquer" badge.
+// moved in the mailbox. Emails the mailbox refused stay filed in the app with an "à appliquer" badge.
 export async function confirmProposal(form: FormData) {
   const { tag, ids } = selection(form);
   const name = String(form.get("name") ?? "").trim().replace(/\/+$/, "");
   if (!name || ids.length === 0) return;
   await db.query("UPDATE emails SET app_folder = $1, tags = tags - $2 WHERE id = ANY($3)", [name, tag, ids]);
   const { failed } = await applyAppFolders(ids);
-  revalidatePath("/");
-  revalidatePath("/boite");
-  if (failed.length) throw new Error(`Rangé dans l'app, mais ${failed.length} mail(s) non déplacé(s) dans Outlook : ${failed[0].error}`);
+  refreshPages();
+  if (failed.length) throw new Error(`Rangé dans l'app, mais ${failed.length} mail(s) non déplacé(s) dans leur boîte : ${failed[0].error}`);
 }
 
-// Retries every email filed in the app but not yet moved in Outlook.
+// Retries every email filed in the app but not yet moved in its mailbox.
 export async function applyPendingToOutlook() {
   const { failed } = await applyAppFolders();
-  revalidatePath("/boite");
-  if (failed.length) throw new Error(`${failed.length} mail(s) non déplacé(s) dans Outlook : ${failed[0].error}`);
+  refreshPages();
+  if (failed.length) throw new Error(`${failed.length} mail(s) non déplacé(s) dans leur boîte : ${failed[0].error}`);
 }
 
 // Refused emails go back in the analysis queue: the suggestion and the "ai:" marker are replaced by a
@@ -38,7 +37,7 @@ export async function rejectProposal(form: FormData) {
     `UPDATE emails SET tags = (tags - $1 - 'ai:qwen2.5:14b') || jsonb_build_array('rejected:' || $1) WHERE id = ANY($2)`,
     [tag, ids],
   );
-  revalidatePath("/");
+  refreshPages();
 }
 
 // One AI batch at a time (both share the GPU).
@@ -66,7 +65,13 @@ export async function scanForCleanup(_prev: null): Promise<null> {
 }
 
 function refreshPages() {
-  for (const path of ["/", "/boite", "/nettoyage"]) revalidatePath(path);
+  revalidatePath("/", "layout"); // every page: the sidebar counters are in the layout
+}
+
+export async function syncNow() {
+  const failed = (await syncAll()).filter((r) => "error" in r);
+  refreshPages();
+  if (failed.length) throw new Error(`Synchro impossible pour ${failed[0].email} : ${(failed[0] as { error: string }).error}`);
 }
 
 // Bound per email: deleteEmail.bind(null, id).

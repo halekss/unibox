@@ -18,6 +18,20 @@ const providers: Record<Provider, Mailbox> = {
 
 export const mailbox = (acc: Account) => providers[acc.provider];
 
+// Syncs every connected account; one failing account does not stop the others.
+export async function syncAll() {
+  const { rows } = await db.query("SELECT * FROM accounts ORDER BY id");
+  const results = [];
+  for (const acc of rows) {
+    try {
+      results.push({ email: acc.email, provider: acc.provider, ...(await mailbox(acc).sync(acc)) });
+    } catch (e) {
+      results.push({ email: acc.email, provider: acc.provider, error: (e as Error).message });
+    }
+  }
+  return results;
+}
+
 // App folder name -> mailbox path: "Epitech" -> "Boîte de réception/Epitech"; full paths are kept.
 export const folderPath = (name: string) => (name === INBOX || name.startsWith(`${INBOX}/`) ? name : `${INBOX}/${name}`);
 

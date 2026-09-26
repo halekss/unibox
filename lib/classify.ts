@@ -9,6 +9,9 @@ type Catalog = { text: string; paths: Set<string> };
 
 // Where an email lives in the app: the folder confirmed in the app wins over the Outlook folder.
 export const EFFECTIVE_FOLDER = "coalesce(app_folder, folder)";
+// Display name of a folder: app folders are bare names ("Epitech"), mailbox folders full paths
+// ("Boîte de réception/Epitech"); both map to "Epitech". The Inbox itself keeps its name.
+export const FOLDER_LABEL = `regexp_replace(${EFFECTIVE_FOLDER}, '^Boîte de réception/', '')`;
 
 // Sent to the model: every folder (Outlook subfolders + folders confirmed in the app) with 3 example
 // subjects, plus the new-folder ideas already pending so the model reuses their names.
@@ -109,6 +112,20 @@ export function toTags(p: Prediction, previous: string[] = []): string[] {
 
 // Emails refused this many times are offered for deletion on the Nettoyage page.
 export const REFUSALS_BEFORE_DELETE = 2;
+
+// Nettoyage candidates: flagged by the AI, or refused too often. Emails marked "keep" never come back.
+export const CLEANUP_WHERE = `NOT tags ? 'keep'
+  AND (tags::text LIKE '%"delete_suggested:%'
+       OR (SELECT count(*) FROM jsonb_array_elements_text(tags) t WHERE t LIKE 'rejected:%') >= ${REFUSALS_BEFORE_DELETE})`;
+
+// Status light for the sidebar and the Comptes page. Short timeout: it runs on every page render.
+export async function langflowUp(): Promise<boolean> {
+  try {
+    return (await fetch(`${process.env.LANGFLOW_URL}/health`, { signal: AbortSignal.timeout(800) })).ok;
+  } catch {
+    return false;
+  }
+}
 
 // Classifies the Inbox-root emails without a pending AI proposal: never-analysed first, then the ones
 // whose proposals were refused (fewest refusals first). `dry` returns predictions without writing.
