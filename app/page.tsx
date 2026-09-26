@@ -15,7 +15,7 @@ export default async function Proposals() {
      ORDER BY e.received_at DESC`,
   );
   const { rows: [left] } = await db.query(
-    `SELECT count(*)::int AS n FROM emails WHERE ${EFFECTIVE_FOLDER} = $1 AND tags = '[]'`,
+    `SELECT count(*)::int AS n FROM emails WHERE ${EFFECTIVE_FOLDER} = $1 AND NOT tags ? 'ai:qwen2.5:14b'`,
     [INBOX],
   );
 

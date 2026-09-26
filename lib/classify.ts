@@ -3,7 +3,7 @@ import { db } from "./db.ts";
 export const INBOX = "Boîte de réception";
 const BODY_CHARS = 2000;
 
-type Email = { id: number; sender: string | null; subject: string | null; body_text: string | null };
+type Email = { id: number; sender: string | null; subject: string | null; body_text: string | null; tags?: string[] };
 export type Prediction = { folder: string | null; confidence: string | null; new_folder_idea: string | null };
 type Catalog = { text: string; paths: Set<string> };
 
@@ -59,12 +59,15 @@ export async function classify(email: Email, catalog: Catalog): Promise<Predicti
     `De : ${email.sender ?? ""}`,
     `Objet : ${email.subject ?? ""}`,
     (email.body_text ?? "").slice(0, BODY_CHARS),
-  ].join("\n");
+  ];
+  const rejected = (email.tags ?? []).filter((t) => t.startsWith("rejected:")).map((t) => t.slice(t.indexOf(":", 9) + 1));
+  if (rejected.length) input.push("", `Propositions déjà refusées par l'utilisateur pour cet email (propose autre chose) : ${rejected.join(", ")}`);
+
 
   const res = await fetch(`${process.env.LANGFLOW_URL}/api/v1/run/${process.env.LANGFLOW_FLOW_ID}?stream=false`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": process.env.LANGFLOW_API_KEY! },
-    body: JSON.stringify({ input_value: input, input_type: "chat", output_type: "chat" }),
+    body: JSON.stringify({ input_value: input.join("\n"), input_type: "chat", output_type: "chat" }),
   });
   if (!res.ok) throw new Error(`Langflow ${res.status}: ${(await res.text()).slice(0, 300)}`);
   const json = await res.json();
@@ -72,23 +75,27 @@ export async function classify(email: Email, catalog: Catalog): Promise<Predicti
 }
 
 // Stored as a flat tag list; "ai:<model>" marks the email as processed even when nothing is suggested.
-export function toTags(p: Prediction): string[] {
+// Earlier "rejected:" tags are kept: they count refusals and steer the next proposal.
+export function toTags(p: Prediction, previous: string[] = []): string[] {
   const d = decide(p);
-  return ["ai:qwen2.5:14b", ...(d.folder ? [`folder:${d.folder}`] : []), ...(d.new_folder_idea ? [`new_folder_idea:${d.new_folder_idea}`] : [])];
+  return [...previous.filter((t) => t.startsWith("rejected:")), "ai:qwen2.5:14b", ...(d.folder ? [`folder:${d.folder}`] : []), ...(d.new_folder_idea ? [`new_folder_idea:${d.new_folder_idea}`] : [])];
 }
 
-// Classifies the untagged emails still at the Inbox root; `dry` returns predictions without writing.
+// Classifies the Inbox-root emails without a pending AI proposal: never-analysed first, then the ones
+// whose proposals were refused (fewest refusals first). `dry` returns predictions without writing.
 export async function tagInbox(limit: number, dry = false) {
   const { rows } = await db.query(
-    `SELECT id, sender, subject, body_text FROM emails
-     WHERE ${EFFECTIVE_FOLDER} = $1 AND tags = '[]' ORDER BY received_at DESC LIMIT $2`,
+    `SELECT id, sender, subject, body_text, tags FROM emails
+     WHERE ${EFFECTIVE_FOLDER} = $1 AND NOT tags ? 'ai:qwen2.5:14b'
+     ORDER BY (SELECT count(*) FROM jsonb_array_elements_text(tags) t WHERE t LIKE 'rejected:%'), received_at DESC
+     LIMIT $2`,
     [INBOX, limit],
   );
   const catalog = await folderCatalog();
   const results = [];
   for (const e of rows) {
     const pred = await classify(e, catalog);
-    if (!dry) await db.query("UPDATE emails SET tags = $1 WHERE id = $2", [JSON.stringify(toTags(pred)), e.id]);
+    if (!dry) await db.query("UPDATE emails SET tags = $1 WHERE id = $2", [JSON.stringify(toTags(pred, e.tags)), e.id]);
     results.push({ subject: e.subject, sender: e.sender, confidence: pred.confidence, ...decide(pred) });
   }
   return results;

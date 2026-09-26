@@ -23,3 +23,11 @@ test("only a confident folder is kept, otherwise the idea wins", () => {
   assert.deepEqual(toTags({ folder: f, confidence: "moyenne", new_folder_idea: "Epitech" }), ["ai:qwen2.5:14b", "new_folder_idea:Epitech"]);
   assert.deepEqual(toTags({ folder: null, confidence: "basse", new_folder_idea: null }), ["ai:qwen2.5:14b"]);
 });
+
+test("previous refusals are kept when re-tagging", () => {
+  assert.deepEqual(toTags({ folder: null, confidence: "basse", new_folder_idea: "Epitech" }, ["rejected:folder:X", "other"]), [
+    "rejected:folder:X",
+    "ai:qwen2.5:14b",
+    "new_folder_idea:Epitech",
+  ]);
+});

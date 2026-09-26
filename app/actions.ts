@@ -17,11 +17,15 @@ export async function confirmProposal(form: FormData) {
   revalidatePath("/");
 }
 
-// Drops the suggestion for the checked emails; the "ai:" marker stays so they are not re-classified.
+// Refused emails go back in the analysis queue: the suggestion and the "ai:" marker are replaced by a
+// "rejected:<suggestion>" tag, which counts refusals and tells the model not to propose it again.
 export async function rejectProposal(form: FormData) {
   const { tag, ids } = selection(form);
   if (ids.length === 0) return;
-  await db.query("UPDATE emails SET tags = tags - $1 WHERE id = ANY($2)", [tag, ids]);
+  await db.query(
+    `UPDATE emails SET tags = (tags - $1 - 'ai:qwen2.5:14b') || jsonb_build_array('rejected:' || $1) WHERE id = ANY($2)`,
+    [tag, ids],
+  );
   revalidatePath("/");
 }
 
