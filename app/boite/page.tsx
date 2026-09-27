@@ -5,6 +5,7 @@ import { plain, senderAddr, senderName, shortDate } from "../text.ts";
 import { applyPendingToOutlook, confirmProposal, deleteEmail, syncNow } from "../actions.ts";
 import { Icon, Prov } from "../Icons.tsx";
 import { PendingButton } from "../Pending.tsx";
+import { MailFrame } from "../MailFrame.tsx";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,7 @@ export default async function Inbox({ searchParams }: { searchParams: Promise<Pa
   ]);
   const selectedId = Number(sp.id) || emails[0]?.id;
   const { rows: [mail] } = selectedId
-    ? await db.query("SELECT id, provider, subject, sender, received_at, body_text, tags FROM emails WHERE id = $1", [selectedId])
+    ? await db.query("SELECT id, provider, subject, sender, received_at, body_html, body_text, tags FROM emails WHERE id = $1", [selectedId])
     : { rows: [] };
 
   // Keeps the current filters when changing one of them (never the undo toast's parameters).
@@ -129,7 +130,9 @@ export default async function Inbox({ searchParams }: { searchParams: Promise<Pa
                 </button>
               </form>
             </div>
-            <pre className="body">{plain(mail.body_text) || "(mail vide)"}</pre>
+            <div className="body">
+              <MailFrame key={mail.id} html={mail.body_html} text={mail.body_text} className="body-in" />
+            </div>
           </>
         )}
       </article>

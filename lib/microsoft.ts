@@ -196,6 +196,11 @@ export async function trashMessage(acc: Account, externalId: string): Promise<vo
   await client.api(`/me/messages/${encodeURIComponent(externalId)}/move`).header("Prefer", IMMUTABLE).post({ destinationId: "deleteditems" });
 }
 
+// Saves a reply (original quoted below) in Outlook's "Brouillons". Nothing is sent: Mail.ReadWrite is enough.
+export async function createReplyDraft(acc: Account, externalId: string, text: string): Promise<void> {
+  await clientFor(acc).api(`/me/messages/${encodeURIComponent(externalId)}/createReply`).header("Prefer", IMMUTABLE).post({ comment: text });
+}
+
 // Returns the id of the Outlook folder at `path` ("Boîte de réception/A/B"), creating missing levels.
 async function ensureFolder(client: Client, path: string): Promise<string> {
   const [root, ...parts] = path.split("/");

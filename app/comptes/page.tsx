@@ -4,6 +4,7 @@ import { disconnectAccount, syncNow } from "../actions.ts";
 import { ConfirmButton } from "../ConfirmButton.tsx";
 import { Icon } from "../Icons.tsx";
 import { PendingButton } from "../Pending.tsx";
+import { Num } from "../Num.tsx";
 
 export const dynamic = "force-dynamic";
 
@@ -47,8 +48,8 @@ export default async function Accounts() {
                 </span>
               </div>
               <div className="stats">
-                <span><b>{a.mails}</b><span className="small muted">mails</span></span>
-                <span><b>{a.folders}</b><span className="small muted">{gmail ? "libellés" : "dossiers"}</span></span>
+                <span><b><Num value={a.mails} /></b><span className="small muted">mails</span></span>
+                <span><b><Num value={a.folders} /></b><span className="small muted">{gmail ? "libellés" : "dossiers"}</span></span>
               </div>
               <span className="small muted">
                 {gmail ? "Boîte de réception (onglets compris) et libellés." : "Boîte de réception et ses sous-dossiers."} Lecture, rangement et corbeille autorisés.

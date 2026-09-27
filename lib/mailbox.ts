@@ -9,11 +9,12 @@ type Mailbox = {
   sync: (acc: Account) => Promise<object>;
   trash: (acc: Account, externalId: string) => Promise<void>;
   moveToFolder: (acc: Account, externalId: string, path: string, cache: Map<string, string>) => Promise<void>;
+  replyDraft: (acc: Account, externalId: string, text: string) => Promise<void>;
 };
 
 const providers: Record<Provider, Mailbox> = {
-  outlook: { sync: outlook.syncAccount, trash: outlook.trashMessage, moveToFolder: outlook.moveToFolder },
-  gmail: { sync: gmail.syncAccount, trash: gmail.trashMessage, moveToFolder: gmail.moveToFolder },
+  outlook: { sync: outlook.syncAccount, trash: outlook.trashMessage, moveToFolder: outlook.moveToFolder, replyDraft: outlook.createReplyDraft },
+  gmail: { sync: gmail.syncAccount, trash: gmail.trashMessage, moveToFolder: gmail.moveToFolder, replyDraft: gmail.createReplyDraft },
 };
 
 export const mailbox = (acc: Account) => providers[acc.provider];
@@ -114,4 +115,25 @@ export async function trashEmail(id: number): Promise<void> {
     }
   }
   await db.query("DELETE FROM emails WHERE id = $1", [id]);
+}
+
+// Saves the (possibly edited) reply as a draft in the email's mailbox, then marks it drafted in the app.
+// Never sends: the user sends it from Outlook/Gmail.
+export async function saveReplyDraft(id: number, text: string): Promise<void> {
+  const { rows } = await db.query(
+    `SELECT e.external_id, ${ACCOUNT_COLUMNS} FROM emails e JOIN accounts a ON a.id = e.account_id WHERE e.id = $1`,
+    [id],
+  );
+  if (!rows[0]) throw new Error("Mail introuvable.");
+  try {
+    await mailbox(rows[0]).replyDraft(rows[0], rows[0].external_id, text);
+  } catch (e) {
+    const status = (e as { statusCode?: number }).statusCode;
+    throw new Error(
+      status === 403 || /invalid_grant|consent|insufficient/i.test((e as Error).message)
+        ? `Permission manquante sur ${rows[0].email} : reconnecte ce compte.`
+        : `Brouillon impossible dans ${rows[0].email} : ${(e as Error).message}`,
+    );
+  }
+  await db.query(`UPDATE emails SET triage = triage || jsonb_build_object('draft', $1::text, 'drafted', true) WHERE id = $2`, [text, id]);
 }

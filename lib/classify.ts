@@ -70,18 +70,22 @@ export async function classify(email: Email, catalog: Catalog): Promise<Predicti
   const rejected = (email.tags ?? []).filter((t) => t.startsWith("rejected:")).map((t) => t.slice(t.indexOf(":", 9) + 1));
   if (rejected.length) input.push("", `Propositions déjà refusées par l'utilisateur pour cet email (propose autre chose) : ${rejected.join(", ")}`);
 
+  return parseOrNothing(await runFlow(process.env.LANGFLOW_FLOW_ID!, input.join("\n")), catalog.paths, email.id);
+}
 
-  const res = await fetch(`${process.env.LANGFLOW_URL}/api/v1/run/${process.env.LANGFLOW_FLOW_ID}?stream=false`, {
+// Runs a Langflow chat flow and returns the model's raw answer.
+export async function runFlow(flowId: string, input: string): Promise<string> {
+  const res = await fetch(`${process.env.LANGFLOW_URL}/api/v1/run/${flowId}?stream=false`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": process.env.LANGFLOW_API_KEY! },
-    body: JSON.stringify({ input_value: input.join("\n"), input_type: "chat", output_type: "chat" }),
+    body: JSON.stringify({ input_value: input, input_type: "chat", output_type: "chat" }),
   }).catch(() => {
     // Network-level failure (refused, timeout): Langflow is not running, which the raw "fetch failed" hides.
     throw new Error(`${LANGFLOW_DOWN} (${process.env.LANGFLOW_URL}). Lance-le : ${LANGFLOW_START}`);
   });
   if (!res.ok) throw new Error(`Langflow ${res.status}: ${(await res.text()).slice(0, 300)}`);
   const json = await res.json();
-  return parseOrNothing(json.outputs[0].outputs[0].results.message.text, catalog.paths, email.id);
+  return json.outputs[0].outputs[0].results.message.text;
 }
 
 // The model occasionally returns malformed JSON. At temperature 0 a retry gives the same answer, so an

@@ -218,6 +218,24 @@ export async function trashMessage(acc: Account, externalId: string): Promise<vo
   await api(acc, `/messages/${externalId}/trash`, { method: "POST" });
 }
 
+// Saves a reply in the message's thread as a Gmail draft. Nothing is sent: gmail.modify is enough.
+export async function createReplyDraft(acc: Account, externalId: string, text: string): Promise<void> {
+  const q = ["Message-ID", "Subject", "From", "Reply-To"].map((h) => `metadataHeaders=${h}`).join("&");
+  const m = await api(acc, `/messages/${externalId}?format=metadata&${q}`);
+  const h = (name: string) => m.payload.headers?.find((x: { name: string }) => x.name.toLowerCase() === name.toLowerCase())?.value ?? "";
+  const subject = /^re\s*:/i.test(h("Subject")) ? h("Subject") : `Re: ${h("Subject")}`;
+  const mime = [
+    `To: ${h("Reply-To") || h("From")}`,
+    `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
+    ...(h("Message-ID") ? [`In-Reply-To: ${h("Message-ID")}`, `References: ${h("Message-ID")}`] : []),
+    "Content-Type: text/plain; charset=UTF-8",
+    "Content-Transfer-Encoding: 8bit",
+    "",
+    text,
+  ].join("\r\n");
+  await api(acc, "/drafts", { method: "POST", body: JSON.stringify({ message: { threadId: m.threadId, raw: Buffer.from(mime).toString("base64url") } }) });
+}
+
 // "Moving" in Gmail = adding the folder's label and leaving the Inbox. The label is created if missing.
 export async function moveToFolder(acc: Account, externalId: string, path: string, labelIds: Map<string, string>): Promise<void> {
   // Back to the Inbox root (undo): Inbox label on, user labels off (a labelled message counts as filed).

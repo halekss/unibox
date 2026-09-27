@@ -30,6 +30,7 @@ CREATE TABLE emails (
   body_text   TEXT,
   received_at TIMESTAMPTZ NOT NULL,
   tags        JSONB NOT NULL DEFAULT '[]',
+  triage      JSONB,  -- Triage flow decision: category, summary, amount, draft (lib/triage.ts)
   UNIQUE (account_id, external_id)
 );
 CREATE INDEX emails_received_at_idx ON emails (received_at DESC);

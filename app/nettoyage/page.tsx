@@ -7,6 +7,7 @@ import { AnalyzeForm } from "../AnalyzeForm.tsx";
 import { Prov } from "../Icons.tsx";
 import { PendingButton } from "../Pending.tsx";
 import { SelectAll } from "../SelectAll.tsx";
+import { Num } from "../Num.tsx";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ type Row = { id: number; provider: string; subject: string | null; sender: strin
 type Group = { key: string; title: string; sub: string; detail: string; provs: Set<string>; mails: Row[] };
 type View = "expediteur" | "raison" | "liste";
 
-const TINTS = ["#E3E0F2", "#DCE4EE", "#DDEBE3", "#F0E4DA", "#E6E9D8"];
+const TINTS = ["rgb(125 211 252 / .22)", "rgb(252 211 77 / .22)", "rgb(110 231 183 / .22)", "rgb(240 171 252 / .22)", "rgb(165 163 201 / .22)"];
 const VIEWS: [View, string][] = [["expediteur", "Par expéditeur"], ["raison", "Par raison"], ["liste", "Un par un"]];
 
 // Most frequent value first, then the others, as one short line.
@@ -115,7 +116,7 @@ function Groups({ groups, view }: { groups: Group[]; view: "expediteur" | "raiso
               {view === "expediteur"
                 ? <span><span className={g.detail.startsWith("Classement refusé") ? "chip ai" : "chip"}>{g.detail}</span></span>
                 : <span className="ellip small muted">{g.detail}</span>}
-              <span className="gcount">{g.mails.length}</span>
+              <Num value={g.mails.length} className="gcount" />
               <span className="small muted">{shortDate(g.mails[0].received_at)}</span>
               <span className="gactions">
                 <PendingButton busy="…" className="btn small" formAction={keepSelected}>Garder</PendingButton>

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db.ts";
 import { safeBack } from "@/lib/auth.ts";
 import { scanFoldersForCleanup, tagInbox } from "@/lib/classify.ts";
-import { applyAppFolders, returnToInbox, syncAll, trashEmail } from "@/lib/mailbox.ts";
+import { applyAppFolders, returnToInbox, saveReplyDraft, syncAll, trashEmail } from "@/lib/mailbox.ts";
 
 function selection(form: FormData) {
   return { tag: String(form.get("tag")), ids: form.getAll("ids").map(Number).filter(Number.isInteger) };
@@ -118,4 +118,31 @@ export async function keepSelected(form: FormData) {
     [ids],
   );
   refreshPages();
+}
+
+// Tri page: the received email, fetched only when its card is opened.
+export async function mailBody(id: number): Promise<{ html: string | null; text: string | null }> {
+  const { rows } = await db.query("SELECT body_html AS html, body_text AS text FROM emails WHERE id = $1", [id]);
+  return rows[0] ?? { html: null, text: null };
+}
+
+// Tri page "Créer le brouillon": saves the reply as a draft in the mailbox (never sent). Errors are returned,
+// not thrown, so the dialog stays open with the message.
+export async function replyDraft(id: number, text: string): Promise<{ error?: string }> {
+  id = Number(id); // emails.id is BIGINT: pg hands it to the page as a string
+  if (!Number.isInteger(id) || !text.trim() || text.length > 20_000) return { error: "Réponse vide ou trop longue." };
+  try {
+    await saveReplyDraft(id, text.trim());
+    return {};
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+}
+
+// Tri page "Déjà répondu" / "C'est fait" / "Lu": the email leaves its column for Archivé (done=false puts it back).
+// Only the app's triage changes; the mailbox is not touched.
+export async function markDone(id: number, done: boolean): Promise<void> {
+  id = Number(id); // emails.id is BIGINT: pg hands it to the page as a string
+  if (!Number.isInteger(id)) return;
+  await db.query("UPDATE emails SET triage = triage || jsonb_build_object('done', $1::boolean) WHERE id = $2 AND triage IS NOT NULL", [done === true, id]);
 }

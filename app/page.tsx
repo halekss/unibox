@@ -9,6 +9,7 @@ import { PendingButton } from "./Pending.tsx";
 import { folderList } from "./queries.ts";
 import { analyzeInbox, confirmProposal, deleteEmail, rejectProposal } from "./actions.ts";
 import { AnalyzeForm } from "./AnalyzeForm.tsx";
+import { Num } from "./Num.tsx";
 
 export const dynamic = "force-dynamic";
 
@@ -74,7 +75,7 @@ export default async function Proposals({ searchParams }: { searchParams: Promis
                     {(where.get(n) ?? []).map((p) => <Prov key={p} p={p} />)}
                   </span>
                   <span className="big">
-                    <b>{list.length}</b>
+                    <b><Num value={list.length} /></b>
                     <span className="muted small">{t.startsWith("new_folder_idea:") ? "nouveau dossier" : list.length > 1 ? "mails" : "mail"}</span>
                   </span>
                   <span className="stack" aria-hidden="true">
