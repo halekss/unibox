@@ -1,13 +1,14 @@
 // "Email Triage" flow (langflow/create_triage_flow.py): what an email asks of the user, stored in emails.triage.
 // No server imports here: the client components share these categories.
 
-// Order = kanban column order. Keys must match the flow's prompt.
+// Order = kanban column order. Keys must match the flow's prompt. Colors: tokens from app/tokens.css
+// (DESIGN_TOKENS.md, pale background + dark text of the same hue).
 export const CATEGORIES = {
-  repondre: { label: "À répondre", verb: "Je prépare une réponse." },
-  faire: { label: "À faire", verb: "Je le note à faire." },
-  argent: { label: "Argent", verb: "Je le range dans Argent." },
-  lire: { label: "À lire", verb: "Je le garde à lire." },
-  archiver: { label: "Archivé", verb: "J'archive." },
+  repondre: { label: "À répondre", verb: "Je prépare une réponse.", bg: "var(--cat-repondre-bg)", text: "var(--cat-repondre-text)" },
+  faire: { label: "À faire", verb: "Je le note à faire.", bg: "var(--cat-faire-bg)", text: "var(--cat-faire-text)" },
+  argent: { label: "Argent", verb: "Je le range dans Argent.", bg: "var(--cat-argent-bg)", text: "var(--cat-argent-text)" },
+  lire: { label: "À lire", verb: "Je le garde à lire.", bg: "var(--cat-lire-bg)", text: "var(--cat-lire-text)" },
+  archiver: { label: "Archivé", verb: "J'archive.", bg: "var(--cat-archiver-bg)", text: "var(--cat-archiver-text)" },
 } as const;
 export type Category = keyof typeof CATEGORIES;
 

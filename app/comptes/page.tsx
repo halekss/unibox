@@ -5,6 +5,7 @@ import { ConfirmButton } from "../ConfirmButton.tsx";
 import { Icon } from "../Icons.tsx";
 import { PendingButton } from "../Pending.tsx";
 import { Num } from "../Num.tsx";
+import { ThemeSwitch } from "../ThemeSwitch.tsx";
 
 export const dynamic = "force-dynamic";
 
@@ -105,6 +106,10 @@ export default async function Accounts() {
           <div><span className="muted">Coût</span><strong>Gratuit, rien ne sort de ta machine</strong></div>
         </div>
       </div>
+
+      <h2 className="section-title" style={{ marginTop: 32 }}>Apparence</h2>
+      <p className="muted" style={{ margin: "0 0 12px" }}>Retenu sur cet appareil. « Système » suit le réglage clair/sombre du téléphone ou du PC.</p>
+      <ThemeSwitch />
     </>
   );
 }

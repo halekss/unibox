@@ -3,28 +3,41 @@
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
 
-/* One dominant hue (indigo / violet). Colour is reserved for the category pills. */
+/* Colors: only the design tokens of app/tokens.css, referenced (never copied). Tailwind's default palette is
+   dropped so a stray bg-white / text-black generates nothing. */
+@theme inline {
+  --color-*: initial;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+  --color-ai: var(--ai);
+  --color-ai-soft: var(--ai-soft);
+  --color-ai-text: var(--ai-text);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-text: var(--success-text);
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-text: var(--danger-text);
+  --color-on-danger: var(--on-danger);
+  --color-overlay: var(--overlay);
+  --shadow-card: var(--shadow);
+}
+
 @theme {
-  --color-night-950: #0b0a24;
-  --color-night-900: #13113a;
-  --color-night-800: #1d1a55;
-  --color-halo: #8b7dff;
-  --color-halo-soft: #c9c2ff;
-  --color-mist: #b6b0e6;
-  --color-glass: #3b3685; /* = --card in layout.tsx: Tri elements sit on the content area's blue */
-  --color-rim: rgb(255 255 255 / 0.12);
-
-  --color-cat-repondre: #7dd3fc;
-  --color-cat-faire: #fcd34d;
-  --color-cat-argent: #6ee7b7;
-  --color-cat-lire: #f0abfc;
-  --color-cat-archiver: #a5a3c9;
-
   --radius-panel: 1.25rem;
-  --blur-glass: 18px;
-  --shadow-glow: 0 0 60px -10px rgb(139 125 255 / 0.55);
 }
 
 .tri-orb {
-  background: radial-gradient(circle at 35% 30%, #fff 0%, var(--color-halo-soft) 22%, var(--color-halo) 55%, var(--color-night-800) 100%);
+  background: radial-gradient(circle at 35% 30%, var(--surface) 0%, var(--accent-soft) 25%, var(--accent) 65%, var(--accent-hover) 100%);
 }

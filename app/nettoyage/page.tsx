@@ -15,7 +15,6 @@ type Row = { id: number; provider: string; subject: string | null; sender: strin
 type Group = { key: string; title: string; sub: string; detail: string; provs: Set<string>; mails: Row[] };
 type View = "expediteur" | "raison" | "liste";
 
-const TINTS = ["rgb(125 211 252 / .22)", "rgb(252 211 77 / .22)", "rgb(110 231 183 / .22)", "rgb(240 171 252 / .22)", "rgb(165 163 201 / .22)"];
 const VIEWS: [View, string][] = [["expediteur", "Par expéditeur"], ["raison", "Par raison"], ["liste", "Un par un"]];
 
 // Most frequent value first, then the others, as one short line.
@@ -99,11 +98,11 @@ function Groups({ groups, view }: { groups: Group[]; view: "expediteur" | "raiso
         <span>Le dernier</span>
         <span />
       </div>
-      {groups.map((g, i) => (
+      {groups.map((g) => (
         <form key={g.key}>
           <details className="group">
             <summary>
-              <span className="avatar" style={{ width: 32, height: 32, fontSize: 14, background: TINTS[i % TINTS.length] }} title="Voir les mails">
+              <span className="avatar" style={{ width: 32, height: 32, fontSize: 14 }} title="Voir les mails">
                 {g.title[0]?.toUpperCase()}
               </span>
               <span className="gname">
@@ -114,7 +113,7 @@ function Groups({ groups, view }: { groups: Group[]; view: "expediteur" | "raiso
                 <span className="ellip small muted">{g.sub}</span>
               </span>
               {view === "expediteur"
-                ? <span><span className={g.detail.startsWith("Classement refusé") ? "chip ai" : "chip"}>{g.detail}</span></span>
+                ? <span><span className="chip ai">{g.detail}</span></span>
                 : <span className="ellip small muted">{g.detail}</span>}
               <Num value={g.mails.length} className="gcount" />
               <span className="small muted">{shortDate(g.mails[0].received_at)}</span>
@@ -157,7 +156,7 @@ function OneByOne({ rows }: { rows: Row[] }) {
               <span className="from">{senderName(m.sender)}</span>
               <span className="ellip subj">{m.subject || "(sans objet)"}</span>
             </label>
-            <span className={m.reason.startsWith("Classement refusé") ? "chip ai" : "chip"}>{m.reason}</span>
+            <span className="chip ai">{m.reason}</span>
             <time dateTime={m.received_at.toISOString()}>{shortDate(m.received_at)}</time>
           </div>
         ))}

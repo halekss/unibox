@@ -1,0 +1,68 @@
+/* Design tokens (DESIGN_TOKENS.md): the only place colors are written. Each token holds its light and dark
+   value via light-dark(). The page (email paper included) follows the theme; the sidebar, toast and command
+   block (layout.tsx) are always dark.
+   Browsers resolve light-dark() where the token is declared, so this one block is declared on every element
+   that switches color-scheme: an element listed here gets the values of its own scheme.
+   color-scheme lives here, not in layout.tsx: Next compiles light-dark() (LightningCSS) into a fallback driven
+   by flags it only emits for color-scheme declarations found in .css files. */
+:root { color-scheme: light dark; }
+/* .theme-light / .theme-dark on <html>: Comptes > Apparence. Not ".light": that class is the status dot. */
+.dark, .theme-dark, .side, .toast, code.cmd { color-scheme: dark; }
+.theme-light, .scheme-light { color-scheme: light; }
+
+:root, .dark, .theme-dark, .theme-light, .scheme-light, .side, .toast, code.cmd {
+  /* Base */
+  --bg: light-dark(#F7F6F2, #141517);
+  --surface: light-dark(#FFFFFF, #1C1E21);
+  --surface-muted: light-dark(#F0EEE9, #232529);
+  --border: light-dark(#E6E4DE, #2A2D31);
+  --border-strong: light-dark(#D6D3CB, #3A3E44);
+  --text: light-dark(#1C1D1F, #ECECEA);
+  --text-secondary: light-dark(#6B6D72, #9A9CA1);
+  --text-muted: light-dark(#8E9095, #74777C);
+
+  /* Accent: user actions */
+  --accent: light-dark(#2F5BD3, #6F93F0);
+  --accent-hover: light-dark(#264BB0, #86A5F3);
+  --accent-soft: light-dark(#E3EAF7, #1E2A45);
+  --on-accent: light-dark(#FFFFFF, #0E1526);
+
+  /* AI: proposed, not validated yet */
+  --ai: light-dark(#C98A1B, #E0A94A);
+  --ai-soft: light-dark(#FBF1DD, #3A2E17);
+  --ai-text: light-dark(#7A5210, #F0C77A);
+
+  /* Success */
+  --success: light-dark(#3E8E63, #5DB185);
+  --success-soft: light-dark(#E2EFE6, #1C3327);
+  --success-text: light-dark(#2A5A3E, #8FD3AE);
+
+  /* Danger: trash and irreversible actions only */
+  --danger: light-dark(#B8432F, #E0715D);
+  --danger-hover: light-dark(#9C3726, #E88A78);
+  --danger-soft: light-dark(#FBE3DE, #3D1F1A);
+  --danger-text: light-dark(#86351F, #F2A596);
+  --on-danger: light-dark(#FFFFFF, #1A0D0A);
+
+  /* Tri IA categories (keys = lib/triage.ts), colors taken from DESIGN_TOKENS.md */
+  --cat-repondre-bg: light-dark(#E3EAF7, #1E2A45); --cat-repondre-text: light-dark(#27406F, #A9C0F2); /* a_traiter */
+  --cat-faire-bg: light-dark(#E1EEF0, #1A3236);    --cat-faire-text: light-dark(#22535B, #93CDD6);    /* pro */
+  --cat-argent-bg: light-dark(#F3EBDD, #332A1C);   --cat-argent-text: light-dark(#6A4E1E, #E2C38E);   /* factures */
+  --cat-lire-bg: light-dark(#EDE6F5, #2C2440);     --cat-lire-text: light-dark(#4E3A70, #C7B5EA);     /* devis */
+  --cat-archiver-bg: light-dark(#ECEBE7, #26282B); --cat-archiver-text: light-dark(#4D4C48, #B7B8BB); /* newsletter */
+
+  /* Mailbox badges "O" / "G": kept at their brand colors (user decision, 2026-09-27) */
+  --outlook: #0F6CBD;
+  --gmail: #C5221F;
+  --on-provider: #FFFFFF;
+
+  --overlay: light-dark(rgb(28 29 31 / .45), rgb(0 0 0 / .6));
+  --shadow: 0 8px 24px light-dark(rgb(28 29 31 / .12), rgb(0 0 0 / .45));
+
+  /* Aliases kept from the previous theme: used all over app/layout.tsx */
+  --card: var(--surface);
+  --muted: var(--text-secondary);
+  --line: var(--border);
+  --line-2: var(--surface-muted);
+  --soft: var(--surface-muted);
+}

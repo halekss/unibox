@@ -14,7 +14,8 @@ type Phase = "idle" | "reading" | "summary" | "sorting";
 
 const KEYS = Object.keys(CATEGORIES) as Category[];
 const VISIBLE = 5; // cards per column before "+ N autres"
-const glass = "rounded-panel border border-rim bg-glass text-white";
+// Panels: muted surface; cards inside them are plain surfaces (DESIGN_TOKENS "ligne de mail").
+const glass = "rounded-panel border border-border bg-surface-muted text-text";
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.08 } } };
 const rise = { hidden: { opacity: 0, y: 24 }, show: { opacity: 1, y: 0 } };
 
@@ -29,7 +30,7 @@ function Orb({ size = "size-14" }: { size?: string }) {
   return (
     <motion.span
       aria-hidden
-      className={`tri-orb ${size} shrink-0 rounded-full shadow-glow`}
+      className={`tri-orb ${size} shrink-0 rounded-full shadow-card`}
       animate={{ scale: [1, 1.08, 1] }}
       transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
     />
@@ -139,24 +140,23 @@ export function TriageStage({ initial }: { initial: Mail[] }) {
   return (
     <MotionConfig reducedMotion="user" transition={spring}>
       <LayoutGroup>
-        <div className="relative isolate flex min-h-[calc(100vh-68px)] flex-col gap-5 text-night-950">
-          {/* text-white: the global `button { color:inherit }` (layout.tsx, unlayered) beats Tailwind classes on buttons */}
-          <header className="flex flex-wrap items-center justify-between gap-4 text-white">
+        <div className="relative isolate flex min-h-[calc(100vh-68px)] flex-col gap-5 text-text">
+          <header className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h1 className="m-0 text-3xl font-black tracking-tight text-night-950">Tri IA</h1>
-              <p className="m-0 text-sm text-night-800/70">Chaque mail lu, compris et rangé selon ce qu&apos;il attend de toi.</p>
+              <h1 className="m-0 text-3xl font-black tracking-tight text-text">Tri IA</h1>
+              <p className="m-0 text-sm text-text-secondary">Chaque mail lu, compris et rangé selon ce qu&apos;il attend de toi.</p>
             </div>
             <button
               onClick={start}
               disabled={phase !== "idle"}
-              className="flex cursor-pointer items-center gap-3 rounded-full border border-rim bg-night-900 py-2 pl-2 pr-5 text-sm font-extrabold text-white shadow-glow transition-colors hover:bg-night-800 disabled:cursor-default"
+              className="flex cursor-pointer items-center gap-3 rounded-full border-0 bg-accent py-2 pl-2 pr-5 text-sm font-bold text-on-accent transition-colors hover:bg-accent-hover disabled:cursor-default"
             >
               <Orb size="size-7" />
               {phase === "idle" ? "Traiter mes mails" : "En cours…"}
             </button>
           </header>
           {error && (
-            <p role="alert" className={`${glass} m-0 px-4 py-3 text-sm text-cat-faire`}>
+            <p role="alert" className={`${glass} m-0 border-border-strong px-4 py-3 text-sm`}>
               {error}
             </p>
           )}
@@ -164,19 +164,19 @@ export function TriageStage({ initial }: { initial: Mail[] }) {
           <div className="grid flex-1 gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
             <aside className={`${glass} flex flex-col gap-3 self-start p-3`}>
               <h2 className="m-0 flex items-center justify-between px-1 text-base font-extrabold">
-                À trier <NumberFlow value={queue.length} className="text-halo-soft" />
+                À trier <NumberFlow value={queue.length} className="text-text-secondary" />
               </h2>
-              {queue.length === 0 && <p className="m-0 px-1 text-sm text-mist">Tout est rangé.</p>}
+              {queue.length === 0 && <p className="m-0 px-1 text-sm text-text-secondary">Tout est rangé.</p>}
               <ul className="m-0 flex list-none flex-col gap-2 p-0">
                 {queue.map((m) => (
-                  <motion.li key={m.id} layoutId={`mail-${m.id}`} className="rounded-xl border border-rim bg-night-800/50 p-3">
+                  <motion.li key={m.id} layoutId={`mail-${m.id}`} className="rounded-xl border border-border bg-surface p-3">
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="truncate text-sm font-bold">{senderName(m.sender)}</span>
-                      <time suppressHydrationWarning className="shrink-0 text-[11px] text-mist">
+                      <time suppressHydrationWarning className="shrink-0 text-[11px] text-text-secondary">
                         {when(m.received_at)}
                       </time>
                     </div>
-                    <p className="m-0 truncate text-xs text-mist">{m.subject ?? "(sans objet)"}</p>
+                    <p className="m-0 truncate text-xs text-text-secondary">{m.subject ?? "(sans objet)"}</p>
                     <AnimatePresence>
                       {m.triage && (
                         <motion.div initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} className="mt-2 origin-left">
@@ -198,7 +198,7 @@ export function TriageStage({ initial }: { initial: Mail[] }) {
                       <h2 className="m-0 text-2xl font-black tracking-tight md:text-3xl">
                         <NumberFlow value={board.length} /> mails lus, compris et rangés
                       </h2>
-                      <p className="m-0 text-night-800/70">
+                      <p className="m-0 text-text-secondary">
                         {pending ? (
                           <>
                             Il te reste <NumberFlow value={pending} /> réponse{pending > 1 ? "s" : ""} à valider.
@@ -223,7 +223,7 @@ export function TriageStage({ initial }: { initial: Mail[] }) {
                         <motion.section key={k} variants={rise} className={`${glass} flex flex-col gap-2 self-start p-3`}>
                           <header className="flex items-center justify-between px-1">
                             <h3 className="m-0 text-base font-extrabold">{CATEGORIES[k].label}</h3>
-                            <NumberFlow value={list.length} className="text-xl font-black text-halo-soft" />
+                            <NumberFlow value={list.length} className="text-xl font-black text-text-secondary" />
                           </header>
                           <ul className="m-0 flex list-none flex-col gap-2 p-0">
                             {(all ? list : list.slice(0, VISIBLE)).map((m) => (
@@ -233,19 +233,21 @@ export function TriageStage({ initial }: { initial: Mail[] }) {
                                     onClick={() => setDone(m.id, !m.triage!.done)}
                                     aria-label={m.triage!.done ? "Remettre dans sa colonne" : DONE[m.triage!.category].button}
                                     title={m.triage!.done ? "Remettre dans sa colonne" : DONE[m.triage!.category].button}
-                                    className={`absolute right-2 top-2 z-10 grid size-7 cursor-pointer place-items-center rounded-full border text-xs transition-colors ${m.triage!.done ? "border-halo bg-halo text-night-950" : "border-rim bg-night-900 text-mist hover:border-halo hover:text-white"}`}
+                                    className={`absolute right-2 top-2 z-10 grid size-7 cursor-pointer place-items-center rounded-full border text-xs transition-colors ${m.triage!.done ? "border-success bg-success-soft text-success-text" : "border-border-strong bg-surface text-text-secondary hover:border-accent hover:text-accent"}`}
                                   >
                                     {m.triage!.done ? "↩" : "✓"}
                                   </button>
                                 )}
                                 <button
                                   onClick={() => setOpenId(m.id)}
-                                  className="w-full cursor-pointer rounded-xl border border-rim bg-night-800/60 p-3 pr-10 text-left text-white transition-colors hover:border-halo"
+                                  className="w-full cursor-pointer rounded-xl border border-border bg-surface p-3 pr-10 text-left text-text transition-colors hover:border-accent"
                                 >
                                   <span className="block truncate text-sm font-bold">{senderName(m.sender)}</span>
-                                  <span className="block truncate text-xs text-mist">{m.subject ?? "(sans objet)"}</span>
+                                  <span className="block truncate text-xs text-text-secondary">{m.subject ?? "(sans objet)"}</span>
                                   <span className="mt-2 block">
-                                    <Pill category={k}>{badge(m.triage!)}</Pill>
+                                    <Pill category={k} tone={toValidate(m.triage) ? "ai" : m.triage!.drafted || m.triage!.done ? "success" : undefined}>
+                                      {badge(m.triage!)}
+                                    </Pill>
                                   </span>
                                 </button>
                               </motion.li>
@@ -254,7 +256,7 @@ export function TriageStage({ initial }: { initial: Mail[] }) {
                           {list.length > VISIBLE && (
                             <button
                               onClick={() => setExpanded((s) => (s.has(k) ? new Set([...s].filter((x) => x !== k)) : new Set(s).add(k)))}
-                              className="cursor-pointer border-0 bg-transparent py-1 text-xs font-semibold text-mist hover:text-white"
+                              className="cursor-pointer border-0 bg-transparent py-1 text-xs font-semibold text-text-secondary hover:text-text"
                             >
                               {all ? "Réduire" : `+ ${list.length - VISIBLE} autres`}
                             </button>
@@ -282,16 +284,16 @@ export function TriageStage({ initial }: { initial: Mail[] }) {
                 <motion.div
                   initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`${glass} sticky bottom-4 mt-4 flex items-center gap-4 bg-night-900 px-5 py-3 shadow-glow`}
+                  className={`${glass} sticky bottom-4 mt-4 flex items-center gap-4 bg-surface px-5 py-3 shadow-card`}
                 >
-                  <span className="grid size-9 shrink-0 place-items-center rounded-full border-2 border-halo-soft text-halo-soft" aria-hidden>
+                  <span className="grid size-9 shrink-0 place-items-center rounded-full border-2 border-success text-success-text" aria-hidden>
                     ✓
                   </span>
                   <div className="min-w-0">
                     <p className="m-0 font-extrabold">
                       <NumberFlow value={board.length} /> mails traités
                     </p>
-                    <p className="m-0 truncate text-xs text-mist">
+                    <p className="m-0 truncate text-xs text-text-secondary">
                       {count(board, "repondre")} à répondre · {pending} à valider · {count(board, "faire")} à faire · {count(board, "argent")} argent ·{" "}
                       {count(board, "archiver")} archivés
                     </p>
@@ -315,25 +317,25 @@ function Reading({ progress: { n, total }, feed }: { progress: { n: number; tota
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.98 }}
-      className={`${glass} absolute inset-x-0 top-0 z-10 h-[min(100%,calc(100vh-190px))] min-h-[520px] flex flex-col gap-5 bg-night-900 p-6 shadow-glow`}
+      className={`${glass} absolute inset-x-0 top-0 z-10 h-[min(100%,calc(100vh-190px))] min-h-[520px] flex flex-col gap-5 bg-surface p-6 shadow-card`}
     >
       <div className="flex items-center gap-4">
         <Orb />
         <div>
           <h2 className="m-0 text-3xl font-black tracking-tight">Je lis tes mails</h2>
-          <p className="m-0 text-mist">Un par un. Qui écrit, pourquoi, et ce que ça demande de toi.</p>
+          <p className="m-0 text-text-secondary">Un par un. Qui écrit, pourquoi, et ce que ça demande de toi.</p>
         </div>
       </div>
       <div className="flex items-center gap-4">
-        <div role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={n} className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
-          <motion.div className="h-full origin-left rounded-full bg-halo-soft" initial={{ scaleX: 0 }} animate={{ scaleX: total ? n / total : 0 }} />
+        <div role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={n} className="h-1.5 flex-1 overflow-hidden rounded-full bg-border">
+          <motion.div className="h-full origin-left rounded-full bg-accent" initial={{ scaleX: 0 }} animate={{ scaleX: total ? n / total : 0 }} />
         </div>
         <span className="shrink-0 text-sm font-bold tabular-nums">
           <NumberFlow value={n} /> / {total} lus
         </span>
       </div>
       <ol aria-live="polite" className="m-0 mt-auto flex list-none flex-col gap-2 p-0">
-        {feed.length === 0 && <li className="text-sm text-mist">{total ? "Je lis le premier mail…" : "Je regarde ce qu'il y a de nouveau…"}</li>}
+        {feed.length === 0 && <li className="text-sm text-text-secondary">{total ? "Je lis le premier mail…" : "Je regarde ce qu'il y a de nouveau…"}</li>}
         <AnimatePresence initial={false}>
           {feed.map((m, i) => (
             <motion.li
@@ -342,11 +344,11 @@ function Reading({ progress: { n, total }, feed }: { progress: { n: number; tota
               initial={{ opacity: 0, y: -14 }}
               animate={{ opacity: 1 - i * 0.13, y: 0 }}
               exit={{ opacity: 0 }}
-              className="flex items-center gap-3 rounded-xl border border-rim bg-night-800/50 px-3 py-2 text-sm"
+              className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2 text-sm"
             >
-              <span className="size-1.5 shrink-0 rounded-full bg-halo-soft" aria-hidden />
+              <span className="size-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
               <span className="min-w-0 flex-1 truncate">
-                <b>{senderName(m.sender)}</b> <span className="text-mist">· {m.triage!.summary}.</span> <b>{CATEGORIES[m.triage!.category].verb}</b>
+                <b>{senderName(m.sender)}</b> <span className="text-text-secondary">· {m.triage!.summary}.</span> <b>{CATEGORIES[m.triage!.category].verb}</b>
               </span>
               <Pill category={m.triage!.category} />
             </motion.li>
@@ -366,13 +368,13 @@ function Summary({ total, counts, onNext }: { total: number; counts: (readonly [
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.98 }}
-      className={`${glass} absolute inset-x-0 top-0 z-10 h-[min(100%,calc(100vh-190px))] min-h-[520px] flex flex-col justify-center gap-6 bg-night-900 p-6 shadow-glow`}
+      className={`${glass} absolute inset-x-0 top-0 z-10 h-[min(100%,calc(100vh-190px))] min-h-[520px] flex flex-col justify-center gap-6 bg-surface p-6 shadow-card`}
     >
       <div className="flex items-center gap-4">
         <Orb />
         <div>
           <h2 className="m-0 text-3xl font-black tracking-tight">Compris.</h2>
-          <p className="m-0 text-mist">
+          <p className="m-0 text-text-secondary">
             <NumberFlow value={shown ? total : 0} /> mail{total > 1 ? "s" : ""} lu{total > 1 ? "s" : ""}. Voilà ce qu&apos;ils demandent.
           </p>
         </div>
@@ -385,7 +387,7 @@ function Summary({ total, counts, onNext }: { total: number; counts: (readonly [
           </motion.li>
         ))}
       </motion.ul>
-      <button onClick={onNext} className="cursor-pointer self-start rounded-full border border-rim bg-halo px-5 py-2 text-sm font-extrabold text-night-950">
+      <button onClick={onNext} className="cursor-pointer self-start rounded-full border-0 bg-accent px-5 py-2 text-sm font-bold text-on-accent hover:bg-accent-hover">
         Ranger
       </button>
     </motion.div>
@@ -396,14 +398,14 @@ function Summary({ total, counts, onNext }: { total: number; counts: (readonly [
 function DraftToast({ name, left }: { name: string; left: number }) {
   const at = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
   return (
-    <div className="flex items-center gap-4 rounded-2xl border border-rim bg-night-800/90 px-5 py-4 text-white shadow-glow backdrop-blur-glass">
-      <svg viewBox="0 0 40 40" className="size-10 shrink-0 text-halo-soft" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+    <div className="flex items-center gap-4 rounded-2xl border border-border bg-surface px-5 py-4 text-text shadow-card">
+      <svg viewBox="0 0 40 40" className="size-10 shrink-0 text-success" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
         <circle cx="20" cy="20" r="18" strokeOpacity="0.5" />
         <motion.path d="M12 21l6 6 10-12" strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ ...spring, delay: 0.15 }} />
       </svg>
       <div>
         <p className="m-0 font-extrabold">Brouillon créé pour {name}</p>
-        <p className="m-0 text-xs text-mist">
+        <p className="m-0 text-xs text-text-secondary">
           À {at} · <NumberFlow value={left} /> restante{left > 1 ? "s" : ""} à valider
         </p>
       </div>
