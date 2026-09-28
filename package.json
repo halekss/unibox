@@ -1,5 +1,5 @@
 {
-  "name": "outlook-unified-inbox",
+  "name": "unibox",
   "private": true,
   "scripts": {
     "dev": "next dev",

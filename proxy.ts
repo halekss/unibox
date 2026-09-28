@@ -8,7 +8,7 @@ export function proxy(req: NextRequest) {
   if (!isAuthorized(req.headers.get("authorization"), process.env.APP_PASSWORD))
     return new NextResponse("Authentification requise", {
       status: 401,
-      headers: { "WWW-Authenticate": 'Basic realm="Unified Inbox", charset="UTF-8"' },
+      headers: { "WWW-Authenticate": 'Basic realm="Unibox", charset="UTF-8"' },
     });
   // Behind Tailscale serve the public host may only be in X-Forwarded-Host (browsers cannot forge it cross-site).
   const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
